@@ -20,8 +20,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void _catto_log_stdlib(char* text) {
+void _catto_log(char* text) {
     printf("%s", text);
+}
+
+void _catto_logChar(char character) {
+    printf("%c", character);
 }
 
 void* _catto_malloc(CATTO_COUNT size) {
@@ -36,7 +40,8 @@ void _catto_free(void* ptr) {
     free(ptr);
 }
 
-#define CATTO_LOG_STDLIB _catto_log_stdlib
+#define CATTO_LOG _catto_log
+#define CATTO_LOG_CHAR _catto_logChar
 #define CATTO_MALLOC _catto_malloc
 #define CATTO_REALLOC _catto_realloc
 #define CATTO_FREE _catto_free
