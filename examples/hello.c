@@ -8,7 +8,8 @@ int main(int argc, char* argv[]) {
     catto_Context* context = catto_newContext();
     catto_Token* firstToken = catto_tokenise(
         "10 +,-:*,/,^,div,mod,&:|,~\n"
-        "20 div mod"
+        "20 \"this is cool\"\n"
+        "30 div mod"
     );
 
     printf("Tokens: ");

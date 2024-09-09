@@ -276,6 +276,65 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
     return CATTO_FALSE;
 }
 
+catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+
+    catto_Char stringOpener = code[index++];
+    catto_Char* currentString = CATTO_MALLOC(8);
+    catto_Count currentStringIndex = 0;
+
+    if (stringOpener != '"' && stringOpener != '\'' && stringOpener != '`') {
+        return CATTO_FALSE;
+    }
+
+    while (CATTO_TRUE) {
+        catto_Char currentChar = code[index++];
+
+        if (currentChar == stringOpener) {
+            break;
+        }
+
+        if (currentChar == '\0' || currentChar == '\n') {
+            return CATTO_FALSE;
+        }
+
+        if (currentChar == '\'') {
+            switch (code[index]) {
+                case '\0':
+                case '\n':
+                    return CATTO_FALSE;
+
+                case 'n': currentChar = '\n'; break;
+                case 'r': currentChar = '\r'; break;
+                case 't': currentChar = '\t'; break;
+                case 'v': currentChar = '\v'; break;
+                case 'b': currentChar = '\b'; break;
+                case 'f': currentChar = '\f'; break;
+
+                default:
+                    currentChar = code[index];
+            }
+
+            index++;
+        }
+
+        currentString[currentStringIndex++] = currentChar;
+        currentString[currentStringIndex] = '\0';
+
+        if (currentStringIndex + 1 == sizeof(currentString)) {
+            currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
+        }
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_STRING, currentTokenPtr);
+
+    token->value.asString = currentString;
+
+    *indexPtr = index;
+
+    return token;
+}
+
 catto_Token* catto_tokenise(catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
@@ -320,6 +379,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
         }
 
         if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchStringLiteral(code, &index, &currentToken)) {
             continue;
         }
 
