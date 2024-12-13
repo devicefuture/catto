@@ -9,6 +9,7 @@ typedef enum {
     CATTO_TOKEN_TYPE_COMMAND = 'c',
     CATTO_TOKEN_TYPE_STRING = '$',
     CATTO_TOKEN_TYPE_NUMBER = '%',
+    CATTO_TOKEN_TYPE_IDENTIFIER = 'x',
     CATTO_TOKEN_TYPE_DELIMETER = ',',
     CATTO_TOKEN_TYPE_STATEMENT_DELIMETER = ':',
     CATTO_TOKEN_TYPE_OPERATOR = '+',
@@ -22,6 +23,7 @@ typedef struct catto_Token {
         catto_Count asCodeIndex;
         catto_Count asLineNumber;
         catto_Char* asString;
+        catto_Char* asIdentifierName;
         catto_Float asFloat;
     } value;
     struct catto_Token* nextToken;

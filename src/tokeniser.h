@@ -84,7 +84,7 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
         i++;
     }
 
-    return CATTO_FALSE;
+    return CATTO_NULL;
 }
 
 catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
@@ -95,7 +95,7 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     catto_Count currentStringIndex = 0;
 
     if (stringOpener != '"' && stringOpener != '\'' && stringOpener != '`') {
-        return CATTO_FALSE;
+        return CATTO_NULL;
     }
 
     while (CATTO_TRUE) {
@@ -106,14 +106,14 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
         }
 
         if (currentChar == '\0' || currentChar == '\n') {
-            return CATTO_FALSE;
+            return CATTO_NULL;
         }
 
         if (currentChar == '\'') {
             switch (code[index]) {
                 case '\0':
                 case '\n':
-                    return CATTO_FALSE;
+                    return CATTO_NULL;
 
                 case 'n': currentChar = '\n'; break;
                 case 'r': currentChar = '\r'; break;
@@ -138,6 +138,58 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     }
 
     catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_STRING, currentTokenPtr);
+
+    token->value.asString = currentString;
+
+    *indexPtr = index;
+
+    return token;
+}
+
+catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+    catto_Char* currentString = CATTO_MALLOC(8);
+    catto_Count currentStringIndex = 0;
+    catto_Char currentChar = code[index++];
+
+    if (!(
+        (currentChar >= 'a' && currentChar <= 'z') ||
+        (currentChar >= 'A' && currentChar <= 'Z') ||
+        currentChar == '_'
+    )) {
+        return CATTO_NULL;
+    }
+
+    currentString[currentStringIndex++] = currentChar;
+    currentString[currentStringIndex] = 0;
+
+    catto_Bool shouldContinue = CATTO_TRUE;
+
+    while (shouldContinue) {
+        currentChar = code[index++];
+
+        if (currentChar == '$' || currentChar == '%') {
+            shouldContinue = CATTO_FALSE;
+        } else if (!(
+            (currentChar >= 'a' && currentChar <= 'z') ||
+            (currentChar >= 'A' && currentChar <= 'Z') ||
+            (currentChar >= '0' && currentChar <= '9') ||
+            currentChar == '_'
+        )) {
+            index--;
+
+            break;
+        }
+
+        currentString[currentStringIndex++] = currentChar;
+        currentString[currentStringIndex] = '\0';
+
+        if (currentStringIndex + 1 == sizeof(currentString)) {
+            currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
+        }
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_IDENTIFIER, currentTokenPtr);
 
     token->value.asString = currentString;
 
@@ -194,6 +246,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
         }
 
         if (catto_matchStringLiteral(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchIdentifier(code, &index, &currentToken)) {
             continue;
         }
 
