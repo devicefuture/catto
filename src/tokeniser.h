@@ -87,6 +87,23 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
     return CATTO_NULL;
 }
 
+catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count charactersEaten = 0;
+    catto_Float number = catto_stringToPositiveNumber(code + *indexPtr, &charactersEaten);
+
+    if (number == CATTO_NAN) {
+        return CATTO_NULL;
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_NUMBER, currentTokenPtr);
+
+    token->value.asNumber = number;
+
+    *indexPtr += charactersEaten;
+
+    return token;
+}
+
 catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
 
@@ -250,6 +267,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
         }
 
         if (catto_matchIdentifier(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchNumber(code, &index, &currentToken)) {
             continue;
         }
 

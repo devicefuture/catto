@@ -22,12 +22,14 @@ typedef struct catto_Token {
     union {
         catto_Count asCodeIndex;
         catto_Count asLineNumber;
+        catto_Float asNumber;
         catto_Char* asString;
         catto_Char* asIdentifierName;
-        catto_Float asFloat;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
+
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
 catto_Context* catto_newContext();
 

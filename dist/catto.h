@@ -67,7 +67,87 @@ typedef CATTO_FLOAT catto_Float;
 #define CATTO_FALSE 0
 #define CATTO_NULL 0
 
+#define CATTO_NAN (0.0 / 0.0)
+#define CATTO_INFINITY (1.0 / 0.0)
+
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
+
+// @source https://stackoverflow.com/a/4392789
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten) {
+    *charactersEaten = 0;
+
+    catto_Count i = 0;
+    catto_Float result = 0;
+    catto_Float factor = 1;
+    catto_Float exponent = 0;
+    catto_Float exponentIsNegative = CATTO_FALSE;
+    catto_Bool afterPoint = CATTO_FALSE;
+    catto_Bool hadDigit = CATTO_FALSE;
+    catto_Bool afterExponentMark = CATTO_FALSE;
+    catto_Bool afterExponentSign = CATTO_FALSE;
+
+    while (string[i] != '\0') {
+        catto_Char character = string[i];
+
+        if (character == '.' && !afterPoint) {
+            afterPoint = CATTO_TRUE;
+        } else if (
+            (character == 'e' || character == 'E') &&
+            !afterExponentMark && hadDigit
+        ) {
+            afterExponentMark = CATTO_TRUE;
+            hadDigit = CATTO_FALSE;
+        } else if (
+            (character == '+' || character == '-') &&
+            afterExponentMark && !afterExponentSign && !hadDigit
+        ) {
+            exponentIsNegative = character == '-';
+            afterExponentSign = CATTO_TRUE;
+        } else if (character >= '0' && character <= '9') {
+            catto_Int digit = character - '0';
+
+            if (afterExponentMark) {
+                exponent = (exponent * 10.0) + digit;
+            } else {
+                if (afterPoint) {
+                    factor /= 10.0;
+                }
+
+                result = (result * 10.0) + digit;
+            }
+
+            hadDigit = CATTO_TRUE;
+        } else {
+            break;
+        }
+
+        i++;
+    }
+
+    if (!afterExponentMark) {
+        exponent = 1;
+    }
+
+    if (!exponentIsNegative) {
+        if (exponent == 1) {
+            // Do nothing
+        } else if (exponent == 0) {
+            result = 1;
+        } else {
+            for (catto_Count i = 0; i < exponent; i++) {
+                result *= 10.0;
+            }
+        }
+    } else {
+        for (catto_Count i = 0; i < exponent; i++) {
+            result /= 10.0;
+        }
+    }
+
+    *charactersEaten = i;
+
+    return result * factor;
+}
 
 // src/declarations.h
 
@@ -95,12 +175,14 @@ typedef struct catto_Token {
     union {
         catto_Count asCodeIndex;
         catto_Count asLineNumber;
+        catto_Float asNumber;
         catto_Char* asString;
         catto_Char* asIdentifierName;
-        catto_Float asFloat;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
+
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
 catto_Context* catto_newContext();
 
@@ -278,6 +360,23 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
     return CATTO_NULL;
 }
 
+catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count charactersEaten = 0;
+    catto_Float number = catto_stringToPositiveNumber(code + *indexPtr, &charactersEaten);
+
+    if (number == CATTO_NAN) {
+        return CATTO_NULL;
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_NUMBER, currentTokenPtr);
+
+    token->value.asNumber = number;
+
+    *indexPtr += charactersEaten;
+
+    return token;
+}
+
 catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
 
@@ -441,6 +540,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
         }
 
         if (catto_matchIdentifier(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchNumber(code, &index, &currentToken)) {
             continue;
         }
 
