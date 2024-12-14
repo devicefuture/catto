@@ -29,10 +29,12 @@ typedef struct catto_Token {
     struct catto_Token* nextToken;
 } catto_Token;
 
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
-
 catto_Context* catto_newContext();
 
 catto_Count catto_stringLength(catto_Char* string);
+catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+
 catto_Token* catto_tokenise(catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
