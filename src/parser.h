@@ -1,3 +1,15 @@
+catto_Char** operatorPrecedence[] = {
+    (catto_Char*[]) {"+", "-", CATTO_NULL},
+    (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
+    (catto_Char*[]) {"^", CATTO_NULL},
+    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
+    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
+    (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
+    (catto_Char*[]) {"and", "or", "xor", "not", CATTO_NULL},
+    (catto_Char*[]) {";", CATTO_NULL},
+    CATTO_NULL
+};
+
 catto_Token* catto_eat(catto_Token** currentTokenPtr) {
     if (!*currentTokenPtr) {
         return CATTO_NULL;
@@ -50,11 +62,108 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 
     catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXPRESSION_LEAF, currentAstNodePtr);
 
+    // TODO: Store leaf node's value
+
+    return astNode;
+}
+
+catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Count level) {
+    catto_Char** operatorsAtLevel = operatorPrecedence[level];
+
+    if (!operatorsAtLevel || !token || token->type != CATTO_TOKEN_TYPE_OPERATOR) {
+        return CATTO_FALSE;
+    }
+
+    catto_Count i = 0;
+
+    while (operatorsAtLevel[i]) {
+        if (catto_stringsEqual(operatorsAtLevel[i], token->value.asString)) {
+            return CATTO_TRUE;
+        }
+
+        i++;
+    }
+
+    return CATTO_FALSE;
+}
+
+catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
+    if (!*currentTokenPtr) {
+        return CATTO_NULL;
+    }
+
+    catto_Char** operators = CATTO_MALLOC(sizeof(catto_Char*));
+    catto_Count operatorCount = 0;
+
+    operators[0] = CATTO_NULL;
+
+    catto_AstNode* firstChild = CATTO_NULL;
+    catto_AstNode* currentChild = CATTO_NULL;
+
+    while (CATTO_TRUE) {
+        if (operatorPrecedence[operatorPrecedenceLevel + 1]) {
+            if (!catto_parseBinaryExpression(operatorPrecedenceLevel + 1, currentTokenPtr, &currentChild)) {
+                return CATTO_NULL;
+            }
+        } else {
+            if (!catto_parseExpressionLeaf(currentTokenPtr, &currentChild)) {
+                return CATTO_NULL;
+            }
+        }
+
+        if (!firstChild) {
+            firstChild = currentChild;
+        }
+
+        catto_Token* operator = *currentTokenPtr;
+
+        if (!operator || operator->type != CATTO_TOKEN_TYPE_OPERATOR) {
+            break;
+        }
+
+        catto_Count lowerOperatorPrecedenceLevel = operatorPrecedenceLevel;
+        catto_Bool reachedLowerPrecedenceLevelOperator = CATTO_FALSE;
+
+        while (lowerOperatorPrecedenceLevel > 0) {
+            if (catto_matchesInOperatorPrecedenceLevel(operator, lowerOperatorPrecedenceLevel - 1)) {
+                reachedLowerPrecedenceLevelOperator = CATTO_TRUE;
+                break;
+            }
+
+            lowerOperatorPrecedenceLevel--;
+        }
+
+        if (reachedLowerPrecedenceLevelOperator) {
+            break;
+        }
+
+        catto_eat(currentTokenPtr);
+
+        operators = CATTO_REALLOC(operators, sizeof(catto_Char*) * (operatorCount + 2));
+        operators[operatorCount++] = operator->value.asString;
+        operators[operatorCount] = CATTO_NULL;
+    }
+
+    if (operatorCount == 0) {
+        if (*currentAstNodePtr) {
+            (*currentAstNodePtr)->nextAstNode = firstChild;
+        }
+
+        *currentAstNodePtr = firstChild;
+
+        return firstChild;
+    }
+
+    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_BINARY_EXPRESSION, currentAstNodePtr);
+
+    astNode->value.asBinaryExpression.firstChild = firstChild;
+    astNode->value.asBinaryExpression.operators = operators;
+
     return astNode;
 }
 
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
-    return catto_parseExpressionLeaf(currentTokenPtr, currentAstNodePtr);
+    return catto_parseBinaryExpression(0, currentTokenPtr, currentAstNodePtr);
 }
 
 catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
@@ -70,7 +179,6 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
 
     if (!commandToken) {
-
         return CATTO_NULL;
     }
 
@@ -104,9 +212,7 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
             firstAstNode = currentAstNode;
         }
 
-        catto_parseStatement(currentTokenPtr, &currentAstNode);
-
-        if (currentAstNode) {
+        if (catto_parseStatement(currentTokenPtr, &currentAstNode)) {
             while (
                 catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_STATEMENT_DELIMETER) ||
                 catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_NEXT_LINE)
@@ -125,14 +231,30 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
     catto_AstNode* currentAstNode = firstAstNode;
 
     while (currentAstNode) {
-        CATTO_LOG_CHAR(currentAstNode->type);
+        switch (currentAstNode->type) {
+            case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
+                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandName);
+                CATTO_LOG_CHAR('(');
 
-        if (currentAstNode->type == CATTO_AST_NODE_TYPE_COMMAND_STATEMENT) {
-            CATTO_LOG_CHAR('(');
+                catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
 
-            catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
+                CATTO_LOG_CHAR(')');
 
-            CATTO_LOG_CHAR(')');
+                break;
+
+            case CATTO_AST_NODE_TYPE_BINARY_EXPRESSION:
+                CATTO_LOG(currentAstNode->value.asBinaryExpression.operators[0]);
+                CATTO_LOG_CHAR('(');
+
+                catto_debugAstNodes(currentAstNode->value.asBinaryExpression.firstChild);
+
+                CATTO_LOG_CHAR(')');
+
+                break;
+
+            default:
+                CATTO_LOG_CHAR(currentAstNode->type);
+                break;
         }
 
         currentAstNode = currentAstNode->nextAstNode;

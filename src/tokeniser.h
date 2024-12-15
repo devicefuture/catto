@@ -73,7 +73,7 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
-    while (matchStrings[i] != CATTO_NULL) {
+    while (matchStrings[i]) {
         catto_Char* currentString = matchStrings[i];
 
         if (catto_stringStartsWith(code + index, currentString)) {

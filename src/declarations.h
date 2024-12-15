@@ -31,19 +31,24 @@ typedef struct catto_Token {
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
-    CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e'
+    CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
+    CATTO_AST_NODE_TYPE_BINARY_EXPRESSION = '+'
 } catto_AstNodeType;
 
 typedef struct catto_AstNode {
     catto_AstNodeType type;
     union {
-        struct catto_AstStatementValue {
+        struct {
             catto_Count lineNumber;
             struct catto_AstNode* firstArgument;
             union {
                 catto_Char* asCommandName;
             } attributes;
         } asStatement;
+        struct {
+            struct catto_AstNode* firstChild;
+            catto_Char** operators;
+        } asBinaryExpression;
     } value;
     struct catto_AstNode* nextAstNode;
 } catto_AstNode;

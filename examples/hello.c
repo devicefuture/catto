@@ -19,7 +19,8 @@ int main(int argc, char* argv[]) {
     firstToken = catto_tokenise(
         "10 print\n"
         "20 print 123\n"
-        "20 print \"hello\", 456, \"world\""
+        "30 print \"hello\", 456 + 789 * 12, \"world\"\n"
+        "40 print 10 - 9 - 8 - 7 - 6"
     );
 
     printf("Tokens: ");
