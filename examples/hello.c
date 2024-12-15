@@ -16,6 +16,21 @@ int main(int argc, char* argv[]) {
     catto_debugTokens(firstToken);
     printf("\n");
 
+    firstToken = catto_tokenise(
+        "10 print\n"
+        "20 print"
+    );
+
+    printf("Tokens: ");
+    catto_debugTokens(firstToken);
+    printf("\n");
+
+    catto_AstNode* firstAstNode = catto_parse(firstToken);
+
+    printf("AST nodes: ");
+    catto_debugAstNodes(firstAstNode);
+    printf("\n");
+
     printf("It works!\n");
 
     return 0;

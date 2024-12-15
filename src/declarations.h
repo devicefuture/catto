@@ -24,10 +24,28 @@ typedef struct catto_Token {
         catto_Count asLineNumber;
         catto_Float asNumber;
         catto_Char* asString;
-        catto_Char* asIdentifierName;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
+
+typedef enum {
+    CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
+    CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c'
+} catto_AstNodeType;
+
+typedef struct catto_AstNode {
+    catto_AstNodeType type;
+    union {
+        struct catto_AstStatementValue {
+            catto_Count lineNumber;
+            struct catto_AstNode* firstArgument;
+            union {
+                catto_Char* asCommandName;
+            } attributes;
+        } asStatement;
+    } value;
+    struct catto_AstNode* nextAstNode;
+} catto_AstNode;
 
 catto_Context* catto_newContext();
 
@@ -38,3 +56,5 @@ catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charac
 
 catto_Token* catto_tokenise(catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
+
+catto_AstNode* catto_parse(catto_Token* firstToken);

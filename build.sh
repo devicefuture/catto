@@ -30,6 +30,7 @@ include src/declarations.h
 include src/contexts.h
 include src/strings.h
 include src/tokeniser.h
+include src/parser.h
 
 tee -a dist/catto.h > /dev/null << EOF
 #endif

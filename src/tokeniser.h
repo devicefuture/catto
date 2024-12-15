@@ -9,6 +9,11 @@ catto_Char* operators[] = {
     CATTO_NULL
 };
 
+catto_Char* commands[] = {
+    "print",
+    CATTO_NULL
+};
+
 catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr) {
     catto_Token* token = CATTO_NEW(catto_Token);
 
@@ -259,6 +264,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
         }
 
         if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchStrings(commands, CATTO_TOKEN_TYPE_COMMAND, code, &index, &currentToken)) {
             continue;
         }
 

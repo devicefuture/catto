@@ -72,83 +72,6 @@ typedef CATTO_FLOAT catto_Float;
 
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
 
-// @source https://stackoverflow.com/a/4392789
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten) {
-    *charactersEaten = 0;
-
-    catto_Count i = 0;
-    catto_Float result = 0;
-    catto_Float factor = 1;
-    catto_Float exponent = 0;
-    catto_Float exponentIsNegative = CATTO_FALSE;
-    catto_Bool afterPoint = CATTO_FALSE;
-    catto_Bool hadDigit = CATTO_FALSE;
-    catto_Bool afterExponentMark = CATTO_FALSE;
-    catto_Bool afterExponentSign = CATTO_FALSE;
-
-    while (string[i] != '\0') {
-        catto_Char character = string[i];
-
-        if (character == '.' && !afterPoint) {
-            afterPoint = CATTO_TRUE;
-        } else if (
-            (character == 'e' || character == 'E') &&
-            !afterExponentMark && hadDigit
-        ) {
-            afterExponentMark = CATTO_TRUE;
-            hadDigit = CATTO_FALSE;
-        } else if (
-            (character == '+' || character == '-') &&
-            afterExponentMark && !afterExponentSign && !hadDigit
-        ) {
-            exponentIsNegative = character == '-';
-            afterExponentSign = CATTO_TRUE;
-        } else if (character >= '0' && character <= '9') {
-            catto_Int digit = character - '0';
-
-            if (afterExponentMark) {
-                exponent = (exponent * 10.0) + digit;
-            } else {
-                if (afterPoint) {
-                    factor /= 10.0;
-                }
-
-                result = (result * 10.0) + digit;
-            }
-
-            hadDigit = CATTO_TRUE;
-        } else {
-            break;
-        }
-
-        i++;
-    }
-
-    if (!afterExponentMark) {
-        exponent = 1;
-    }
-
-    if (!exponentIsNegative) {
-        if (exponent == 1) {
-            // Do nothing
-        } else if (exponent == 0) {
-            result = 1;
-        } else {
-            for (catto_Count i = 0; i < exponent; i++) {
-                result *= 10.0;
-            }
-        }
-    } else {
-        for (catto_Count i = 0; i < exponent; i++) {
-            result /= 10.0;
-        }
-    }
-
-    *charactersEaten = i;
-
-    return result * factor;
-}
-
 // src/declarations.h
 
 typedef struct catto_Context {
@@ -177,18 +100,40 @@ typedef struct catto_Token {
         catto_Count asLineNumber;
         catto_Float asNumber;
         catto_Char* asString;
-        catto_Char* asIdentifierName;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
 
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+typedef enum {
+    CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
+    CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c'
+} catto_AstNodeType;
+
+typedef struct catto_AstNode {
+    catto_AstNodeType type;
+    union {
+        struct catto_AstStatementValue {
+            catto_Count lineNumber;
+            struct catto_AstNode* firstArgument;
+            union {
+                catto_Char* asCommandName;
+            } attributes;
+        } asStatement;
+    } value;
+    struct catto_AstNode* nextAstNode;
+} catto_AstNode;
 
 catto_Context* catto_newContext();
 
 catto_Count catto_stringLength(catto_Char* string);
+catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+
 catto_Token* catto_tokenise(catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
+
+catto_AstNode* catto_parse(catto_Token* firstToken);
 
 // src/contexts.h
 
@@ -267,6 +212,83 @@ catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
     return CATTO_FALSE;
 }
 
+// @source https://stackoverflow.com/a/4392789
+catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten) {
+    *charactersEaten = 0;
+
+    catto_Count i = 0;
+    catto_Float result = 0;
+    catto_Float factor = 1;
+    catto_Float exponent = 0;
+    catto_Float exponentIsNegative = CATTO_FALSE;
+    catto_Bool afterPoint = CATTO_FALSE;
+    catto_Bool hadDigit = CATTO_FALSE;
+    catto_Bool afterExponentMark = CATTO_FALSE;
+    catto_Bool afterExponentSign = CATTO_FALSE;
+
+    while (string[i] != '\0') {
+        catto_Char character = string[i];
+
+        if (character == '.' && !afterPoint) {
+            afterPoint = CATTO_TRUE;
+        } else if (
+            (character == 'e' || character == 'E') &&
+            !afterExponentMark && hadDigit
+        ) {
+            afterExponentMark = CATTO_TRUE;
+            hadDigit = CATTO_FALSE;
+        } else if (
+            (character == '+' || character == '-') &&
+            afterExponentMark && !afterExponentSign && !hadDigit
+        ) {
+            exponentIsNegative = character == '-';
+            afterExponentSign = CATTO_TRUE;
+        } else if (character >= '0' && character <= '9') {
+            catto_Int digit = character - '0';
+
+            if (afterExponentMark) {
+                exponent = (exponent * 10.0) + digit;
+            } else {
+                if (afterPoint) {
+                    factor /= 10.0;
+                }
+
+                result = (result * 10.0) + digit;
+            }
+
+            hadDigit = CATTO_TRUE;
+        } else {
+            break;
+        }
+
+        i++;
+    }
+
+    if (!afterExponentMark) {
+        exponent = 1;
+    }
+
+    if (!exponentIsNegative) {
+        if (exponent == 1) {
+            // Do nothing
+        } else if (exponent == 0) {
+            result = 1;
+        } else {
+            for (catto_Count i = 0; i < exponent; i++) {
+                result *= 10.0;
+            }
+        }
+    } else {
+        for (catto_Count i = 0; i < exponent; i++) {
+            result /= 10.0;
+        }
+    }
+
+    *charactersEaten = i;
+
+    return result * factor;
+}
+
 #endif
 
 // src/tokeniser.h
@@ -279,6 +301,11 @@ catto_Char* operators[] = {
     "!=", "<=", ">=", "=", "<", ">",
     "and", "or", "xor", "not",
     ";",
+    CATTO_NULL
+};
+
+catto_Char* commands[] = {
+    "print",
     CATTO_NULL
 };
 
@@ -535,6 +562,10 @@ catto_Token* catto_tokenise(catto_Char* code) {
             continue;
         }
 
+        if (catto_matchStrings(commands, CATTO_TOKEN_TYPE_COMMAND, code, &index, &currentToken)) {
+            continue;
+        }
+
         if (catto_matchStringLiteral(code, &index, &currentToken)) {
             continue;
         }
@@ -570,5 +601,91 @@ void catto_debugTokens(catto_Token* firstToken) {
 }
 
 #endif
+
+// src/parser.h
+
+catto_Token* catto_eat(catto_Token** currentToken, catto_TokenType type) {
+    if (!*currentToken || (*currentToken)->type != type) {
+        return CATTO_NULL;
+    }
+
+    catto_Token* returnToken = *currentToken;
+
+    *currentToken = returnToken->nextToken;
+    
+    return returnToken;
+}
+
+catto_AstNode* catto_parseStatement(catto_Token** currentToken) {
+    if (!*currentToken) {
+        return CATTO_NULL;
+    }
+
+    catto_AstNode* astNode = CATTO_NEW(catto_AstNode);
+    catto_Token* lineNumberToken = catto_eat(currentToken, CATTO_TOKEN_TYPE_LINE_NUMBER);
+
+    astNode->type = CATTO_AST_NODE_TYPE_COMMAND_STATEMENT;
+    astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+    astNode->nextAstNode = CATTO_NULL;
+
+    catto_Token* commandToken = catto_eat(currentToken, CATTO_TOKEN_TYPE_COMMAND);
+
+    if (!commandToken) {
+        return CATTO_NULL;
+    }
+
+    astNode->value.asStatement.firstArgument = CATTO_NULL;
+    astNode->value.asStatement.attributes.asCommandName = commandToken->value.asString;
+
+    return astNode;
+}
+
+catto_AstNode* catto_parse(catto_Token* firstToken) {
+    catto_Token** currentToken = &firstToken;
+    catto_AstNode* firstAstNode = CATTO_NULL;
+    catto_AstNode* lastAstNode = CATTO_NULL;
+
+    while (*currentToken) {
+        catto_AstNode* currentAstNode = catto_parseStatement(currentToken);
+
+        if (currentAstNode) {
+            while (
+                catto_eat(currentToken, CATTO_TOKEN_TYPE_STATEMENT_DELIMETER) ||
+                catto_eat(currentToken, CATTO_TOKEN_TYPE_NEXT_LINE)
+            ) {}
+        } else {
+            currentAstNode = CATTO_NEW(catto_AstNode);
+
+            currentAstNode->type = CATTO_AST_NODE_TYPE_SYNTAX_ERROR;
+            currentAstNode->nextAstNode = CATTO_NULL;
+        }
+
+        if (lastAstNode) {
+            lastAstNode->nextAstNode = currentAstNode;
+        }
+
+        lastAstNode = currentAstNode;
+
+        if (!firstAstNode) {
+            firstAstNode = currentAstNode;
+        }
+
+        if (currentAstNode->type == CATTO_AST_NODE_TYPE_SYNTAX_ERROR) {
+            break;
+        }
+    }
+
+    return firstAstNode;
+}
+
+void catto_debugAstNodes(catto_AstNode* firstAstNode) {
+    catto_AstNode* currentAstNode = firstAstNode;
+
+    while (currentAstNode) {
+        CATTO_LOG_CHAR(currentAstNode->type);
+
+        currentAstNode = currentAstNode->nextAstNode;
+    }
+}
 
 #endif
