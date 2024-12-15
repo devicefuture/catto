@@ -30,7 +30,8 @@ typedef struct catto_Token {
 
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
-    CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c'
+    CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
+    CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e'
 } catto_AstNodeType;
 
 typedef struct catto_AstNode {
@@ -58,3 +59,4 @@ catto_Token* catto_tokenise(catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_parse(catto_Token* firstToken);
+void catto_debugAstNodes(catto_AstNode* firstAstNode);
