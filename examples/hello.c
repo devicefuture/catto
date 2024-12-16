@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     catto_load(
         context,
         "10 print \"Hello, world!\"\n"
-        "20 print 1, 2, -3, 4.59e-8"
+        "20 print 1, 2 + 4 - 1 + 4 - 7, -3, 4.59e-8"
     );
 
     catto_run(context);

@@ -29,8 +29,16 @@ catto_TypedValue catto_unary_add(catto_TypedValue value) {
     return catto_asTypedNumber(catto_asNumber(value));
 }
 
+catto_TypedValue catto_binary_add(catto_TypedValue a, catto_TypedValue b) {
+    return catto_asTypedNumber(catto_asNumber(a) + catto_asNumber(b));
+}
+
 catto_TypedValue catto_unary_subtract(catto_TypedValue value) {
     return catto_asTypedNumber(-catto_asNumber(value));
+}
+
+catto_TypedValue catto_binary_subtract(catto_TypedValue a, catto_TypedValue b) {
+    return catto_asTypedNumber(catto_asNumber(a) - catto_asNumber(b));
 }
 
 catto_TypedValue catto_unary_not(catto_TypedValue value) {
@@ -38,8 +46,8 @@ catto_TypedValue catto_unary_not(catto_TypedValue value) {
 }
 
 catto_OperatorMapping catto_operatorMappings[] = {
-    {"+", catto_unary_add, CATTO_NULL},
-    {"-", catto_unary_subtract, CATTO_NULL},
+    {"+", catto_unary_add, catto_binary_add},
+    {"-", catto_unary_subtract, catto_binary_subtract},
     {"not", catto_unary_not, CATTO_NULL},
     {CATTO_NULL, CATTO_NULL, CATTO_NULL}
 };

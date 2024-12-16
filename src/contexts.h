@@ -70,6 +70,46 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         }
     }
 
+    if (astNode->type == CATTO_AST_NODE_TYPE_BINARY_EXPRESSION) {
+        catto_AstNode* currentChild = astNode->value.asBinaryExpression.firstChild;
+        catto_TypedValue currentValue = catto_evalExpression(context, currentChild);
+        catto_Count i = 0;
+
+        currentChild = currentChild->nextAstNode;
+
+        while (currentChild) {
+            catto_Char* operator = astNode->value.asBinaryExpression.operators[i++];
+            catto_Bool foundOperatorMapping = CATTO_FALSE;
+            catto_Count j = 0;
+
+            while (catto_operatorMappings[j].operator) {
+                catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[j];
+
+                if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+                    catto_BinaryOperatorFunction function = currentOperatorMapping.binaryFunction;
+
+                    if (function) {
+                        currentValue = function(currentValue, catto_evalExpression(context, currentChild));
+                        foundOperatorMapping = CATTO_TRUE;
+                        break;
+                    }
+
+                    return DEFAULT_RETURN_VALUE;
+                }
+
+                j++;
+            }
+
+            if (!foundOperatorMapping) {
+                return DEFAULT_RETURN_VALUE;
+            }
+
+            currentChild = currentChild->nextAstNode;
+        }
+
+        return currentValue;
+    }
+
     return DEFAULT_RETURN_VALUE;
 }
 
