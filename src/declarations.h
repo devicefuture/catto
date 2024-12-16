@@ -1,6 +1,8 @@
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
+    struct catto_Variable* firstVariable;
+    struct catto_Variable* lastVariable;
     struct catto_AstNode* firstParsedStatement;
     struct catto_AstNode* nextParsedStatement;
     struct catto_AstNode* firstParsedArgument;
@@ -57,6 +59,12 @@ typedef struct catto_TypedValue {
     } value;
 } catto_TypedValue;
 
+typedef struct catto_Variable {
+    catto_Char* name;
+    catto_TypedValue value;
+    struct catto_Variable* nextVariable;
+} catto_Variable;
+
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
@@ -103,6 +111,15 @@ typedef struct catto_OperatorMapping {
 
 catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
+void catto_addContextStandardCommands(catto_Context* context);
+catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
+catto_Bool catto_hasNextArg(catto_Context* context);
+catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
+catto_TypedValue catto_evalNextArg(catto_Context* context);
+catto_Bool catto_step(catto_Context* context);
+void catto_goto(catto_Context* context, catto_Count lineNumber);
+void catto_load(catto_Context* context, catto_Char* code);
+void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);

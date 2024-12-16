@@ -3,6 +3,9 @@ catto_Context* catto_newContext() {
 
     context->firstCommandHandler = CATTO_NULL;
     context->lastCommandHandler = CATTO_NULL;
+    context->firstVariable = CATTO_NULL;
+    context->lastVariable = CATTO_NULL;
+
     context->firstParsedStatement = CATTO_NULL;
     context->nextParsedStatement = CATTO_NULL;
     context->firstParsedArgument = CATTO_NULL;
@@ -29,6 +32,20 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     }
 }
 
+catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
+    catto_Variable* currentVariable = context->firstVariable;
+
+    while (currentVariable) {
+        if (catto_stringsEqual(currentVariable->name, name)) {
+            return &(currentVariable->value);
+        }
+
+        currentVariable = currentVariable->nextVariable;
+    }
+
+    return CATTO_NULL;
+}
+
 catto_Bool catto_hasNextArg(catto_Context* context) {
     return !!context->nextParsedArgument;
 }
@@ -46,6 +63,16 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
     if (astNode->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
         if (astNode->value.asExpressionLeaf.value) {
             return *(astNode->value.asExpressionLeaf.value);
+        }
+
+        catto_Char* subjectVariable = astNode->value.asExpressionLeaf.subjectVariable;
+
+        if (subjectVariable) {
+            catto_TypedValue* variableValue = catto_getVariable(context, subjectVariable);
+
+            if (variableValue) {
+                return *variableValue;
+            }
         }
     }
 
