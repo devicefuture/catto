@@ -54,7 +54,7 @@ void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValu
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
-        variable->name = name;
+        variable->name = catto_copyString(name);
         variable->value = value;
         variable->nextVariable = CATTO_NULL;
 
@@ -235,8 +235,14 @@ void catto_load(catto_Context* context, catto_Char* code) {
     catto_Token* firstToken = catto_tokenise(context, code);
     catto_AstNode* firstAstNode = catto_parse(firstToken);
 
+    if (context->firstParsedStatement) {
+        catto_freeAstNodes(context->firstParsedStatement);
+    }
+
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
+
+    catto_freeTokens(firstToken);
 }
 
 void catto_run(catto_Context* context) {

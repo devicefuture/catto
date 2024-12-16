@@ -8,7 +8,7 @@ catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr)
     token->nextToken = CATTO_NULL;
 
     if (*currentTokenPtr) {
-        (*currentTokenPtr)->nextToken = token;        
+        (*currentTokenPtr)->nextToken = token;
     }
 
     *currentTokenPtr = token;
@@ -125,6 +125,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     catto_Count currentStringIndex = 0;
 
     if (stringOpener != '"' && stringOpener != '\'' && stringOpener != '`') {
+        CATTO_FREE(currentString);
+
         return CATTO_NULL;
     }
 
@@ -136,6 +138,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
         }
 
         if (currentChar == '\0' || currentChar == '\n') {
+            CATTO_FREE(currentString);
+
             return CATTO_NULL;
         }
 
@@ -143,6 +147,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
             switch (code[index]) {
                 case '\0':
                 case '\n':
+                    CATTO_FREE(currentString);
+
                     return CATTO_NULL;
 
                 case 'n': currentChar = '\n'; break;
@@ -187,6 +193,8 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
         (currentChar >= 'A' && currentChar <= 'Z') ||
         currentChar == '_'
     )) {
+        CATTO_FREE(currentString);
+
         return CATTO_NULL;
     }
 
@@ -309,6 +317,28 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
     }
 
     return firstToken;
+}
+
+void catto_freeTokens(catto_Token* firstToken) {
+    catto_Token* currentToken = firstToken;
+
+    while (currentToken) {
+        catto_Token* lastToken = currentToken;
+
+        switch (currentToken->type) {
+            case CATTO_TOKEN_TYPE_STRING:
+            case CATTO_TOKEN_TYPE_IDENTIFIER:
+                CATTO_FREE(currentToken->value.asString);
+                break;
+
+            default:
+                break;
+        }
+
+        currentToken = currentToken->nextToken;
+
+        CATTO_FREE(lastToken);
+    }
 }
 
 void catto_debugTokens(catto_Token* firstToken) {

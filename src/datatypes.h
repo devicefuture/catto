@@ -37,3 +37,15 @@ catto_TypedValue catto_asTypedString(catto_Char* value) {
         .value.asString = catto_copyString(value)
     };
 }
+
+void catto_freeTypedValue(catto_TypedValue* valuePtr) {
+    if (!valuePtr) {
+        return;
+    }
+
+    if (valuePtr->type == CATTO_DATA_TYPE_STRING) {
+        CATTO_FREE(valuePtr->value.asString);
+    }
+
+    CATTO_FREE(valuePtr);
+}

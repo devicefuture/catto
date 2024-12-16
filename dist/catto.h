@@ -223,12 +223,15 @@ catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
+void catto_freeTypedValue(catto_TypedValue* valuePtr);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
+void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
+void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
 
 // src/operators.h
@@ -391,7 +394,7 @@ void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValu
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
-        variable->name = name;
+        variable->name = catto_copyString(name);
         variable->value = value;
         variable->nextVariable = CATTO_NULL;
 
@@ -572,8 +575,14 @@ void catto_load(catto_Context* context, catto_Char* code) {
     catto_Token* firstToken = catto_tokenise(context, code);
     catto_AstNode* firstAstNode = catto_parse(firstToken);
 
+    if (context->firstParsedStatement) {
+        catto_freeAstNodes(context->firstParsedStatement);
+    }
+
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
+
+    catto_freeTokens(firstToken);
 }
 
 void catto_run(catto_Context* context) {
@@ -1035,6 +1044,18 @@ catto_TypedValue catto_asTypedString(catto_Char* value) {
     };
 }
 
+void catto_freeTypedValue(catto_TypedValue* valuePtr) {
+    if (!valuePtr) {
+        return;
+    }
+
+    if (valuePtr->type == CATTO_DATA_TYPE_STRING) {
+        CATTO_FREE(valuePtr->value.asString);
+    }
+
+    CATTO_FREE(valuePtr);
+}
+
 // src/tokeniser.h
 
 #ifndef CATTO_TOKENISER_H_
@@ -1047,7 +1068,7 @@ catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr)
     token->nextToken = CATTO_NULL;
 
     if (*currentTokenPtr) {
-        (*currentTokenPtr)->nextToken = token;        
+        (*currentTokenPtr)->nextToken = token;
     }
 
     *currentTokenPtr = token;
@@ -1164,6 +1185,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     catto_Count currentStringIndex = 0;
 
     if (stringOpener != '"' && stringOpener != '\'' && stringOpener != '`') {
+        CATTO_FREE(currentString);
+
         return CATTO_NULL;
     }
 
@@ -1175,6 +1198,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
         }
 
         if (currentChar == '\0' || currentChar == '\n') {
+            CATTO_FREE(currentString);
+
             return CATTO_NULL;
         }
 
@@ -1182,6 +1207,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
             switch (code[index]) {
                 case '\0':
                 case '\n':
+                    CATTO_FREE(currentString);
+
                     return CATTO_NULL;
 
                 case 'n': currentChar = '\n'; break;
@@ -1226,6 +1253,8 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
         (currentChar >= 'A' && currentChar <= 'Z') ||
         currentChar == '_'
     )) {
+        CATTO_FREE(currentString);
+
         return CATTO_NULL;
     }
 
@@ -1348,6 +1377,28 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
     }
 
     return firstToken;
+}
+
+void catto_freeTokens(catto_Token* firstToken) {
+    catto_Token* currentToken = firstToken;
+
+    while (currentToken) {
+        catto_Token* lastToken = currentToken;
+
+        switch (currentToken->type) {
+            case CATTO_TOKEN_TYPE_STRING:
+            case CATTO_TOKEN_TYPE_IDENTIFIER:
+                CATTO_FREE(currentToken->value.asString);
+                break;
+
+            default:
+                break;
+        }
+
+        currentToken = currentToken->nextToken;
+
+        CATTO_FREE(lastToken);
+    }
 }
 
 void catto_debugTokens(catto_Token* firstToken) {
@@ -1550,22 +1601,32 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
     while (CATTO_TRUE) {
         if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_BRACKET)) {
             if (!catto_parseExpression(currentTokenPtr, &currentChild)) {
+                CATTO_FREE(operators);
+
                 return CATTO_NULL;
             }
 
             if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_BRACKET)) {
+                CATTO_FREE(operators);
+
                 return CATTO_NULL;
             }
         } else if (*currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR) {
             if (!catto_parseUnaryExpression(currentTokenPtr, &currentChild)) {
+                CATTO_FREE(operators);
+
                 return CATTO_NULL;
             }
         } else if (catto_operatorPrecedence[operatorPrecedenceLevel + 1]) {
             if (!catto_parseBinaryExpression(operatorPrecedenceLevel + 1, currentTokenPtr, &currentChild)) {
+                CATTO_FREE(operators);
+
                 return CATTO_NULL;
             }
         } else {
             if (!catto_parseExpressionLeaf(currentTokenPtr, &currentChild)) {
+                CATTO_FREE(operators);
+
                 return CATTO_NULL;
             }
         }
@@ -1607,6 +1668,8 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
         if (*currentAstNodePtr) {
             (*currentAstNodePtr)->nextAstNode = firstChild;
         }
+
+        CATTO_FREE(operators);
 
         *currentAstNodePtr = firstChild;
 
@@ -1660,7 +1723,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     catto_Token* identifierToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
     if (identifierToken) {
-        catto_Char* subjectVariable = identifierToken->value.asString;
+        catto_Char* subjectVariable = catto_copyString(identifierToken->value.asString);
         catto_AstNode* index = CATTO_NULL;
 
         if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
@@ -1719,6 +1782,56 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
     }
 
     return firstAstNode;
+}
+
+void catto_freeAstNodes(catto_AstNode* firstAstNode) {
+    catto_AstNode* currentAstNode = firstAstNode;
+
+    while (currentAstNode) {
+        catto_AstNode* lastAstNode = currentAstNode;
+
+        switch (currentAstNode->type) {
+            case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
+                catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
+                break;
+
+            case CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT:
+                catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
+                catto_freeAstNodes(currentAstNode->value.asStatement.attributes.asAssignee.index);
+
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asAssignee.subjectVariable);
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_EXPRESSION_LEAF:
+                catto_freeTypedValue(currentAstNode->value.asExpressionLeaf.value);
+
+                catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.index);
+
+                CATTO_FREE(currentAstNode->value.asExpressionLeaf.subjectVariable);
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_UNARY_EXPRESSION:
+                catto_freeAstNodes(currentAstNode->value.asUnaryExpression.child);
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_BINARY_EXPRESSION:
+                catto_freeAstNodes(currentAstNode->value.asBinaryExpression.firstChild);
+
+                CATTO_FREE(currentAstNode->value.asBinaryExpression.operators);
+
+                break;
+
+            default:
+                break;
+        }
+
+        currentAstNode = currentAstNode->nextAstNode;
+
+        CATTO_FREE(lastAstNode);
+    }
 }
 
 void catto_debugAstNodes(catto_AstNode* firstAstNode) {

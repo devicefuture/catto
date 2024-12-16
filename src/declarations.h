@@ -145,10 +145,13 @@ catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
+void catto_freeTypedValue(catto_TypedValue* valuePtr);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
+void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
+void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);

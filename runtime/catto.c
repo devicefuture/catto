@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <malloc.h>
 #include <catto-config.h>
 #include <catto.h>
+
+#define DEBUG_MEMORY
 
 typedef struct Line {
     unsigned int lineNumber;
@@ -38,6 +41,10 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         size_t size;
+
+        #ifdef DEBUG_MEMORY
+            printf("Memory usage: %d\n", mallinfo2().uordblks);
+        #endif
 
         getline(&lineString, &size, stdin);
 
