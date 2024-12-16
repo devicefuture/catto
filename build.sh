@@ -39,6 +39,8 @@ tee -a dist/catto.h > /dev/null << EOF
 #endif
 EOF
 
+mkdir -p runtime/build
 mkdir -p examples/build
 
+$CC -Idist/ runtime/catto.c -o runtime/build/catto
 $CC -Idist/ examples/hello.c -o examples/build/hello

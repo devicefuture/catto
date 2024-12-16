@@ -684,7 +684,7 @@ catto_Char* catto_numberToString(catto_Float number) {
 
         catto_Char* exponentString = catto_numberToString(exponent);
 
-        catto_appendToString(string, exponentString);
+        string = catto_appendToString(string, exponentString);
 
         CATTO_FREE(exponentString);
     }
