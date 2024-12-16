@@ -32,6 +32,7 @@ typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
     CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
+    CATTO_AST_NODE_TYPE_UNARY_EXPRESSION = '-',
     CATTO_AST_NODE_TYPE_BINARY_EXPRESSION = '+'
 } catto_AstNodeType;
 
@@ -45,6 +46,10 @@ typedef struct catto_AstNode {
                 catto_Char* asCommandName;
             } attributes;
         } asStatement;
+        struct {
+            struct catto_AstNode* child;
+            catto_Char* operator;
+        } asUnaryExpression;
         struct {
             struct catto_AstNode* firstChild;
             catto_Char** operators;
@@ -63,5 +68,6 @@ catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charac
 catto_Token* catto_tokenise(catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
 
+catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);

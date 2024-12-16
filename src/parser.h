@@ -5,8 +5,15 @@ catto_Char** operatorPrecedence[] = {
     (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
     (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
     (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
-    (catto_Char*[]) {"and", "or", "xor", "not", CATTO_NULL},
+    (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
     (catto_Char*[]) {";", CATTO_NULL},
+    CATTO_NULL
+};
+
+catto_Char* unaryOperators[] = {
+    "+",
+    "-",
+    "not",
     CATTO_NULL
 };
 
@@ -87,6 +94,57 @@ catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Coun
     return CATTO_FALSE;
 }
 
+catto_AstNode* catto_parseUnaryExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
+    if (!*currentTokenPtr) {
+        return CATTO_NULL;
+    }
+
+    catto_Token* operator = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
+
+    if (!operator) {
+        return CATTO_NULL;
+    }
+
+    catto_Count i = 0;
+    catto_Bool operatorIsUnary = CATTO_FALSE;
+
+    while (unaryOperators[i]) {
+        if (catto_stringsEqual(unaryOperators[i], operator->value.asString)) {
+            operatorIsUnary = CATTO_TRUE;
+            break;
+        }
+
+        i++;
+    }
+
+    if (!operatorIsUnary) {
+        return CATTO_NULL;
+    }
+
+    catto_AstNode* child = CATTO_NULL;
+
+    if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_BRACKET)) {
+        if (!catto_parseExpression(currentTokenPtr, &child)) {
+            return CATTO_NULL;
+        }
+
+        if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_BRACKET)) {
+            return CATTO_NULL;
+        }
+    } else {
+        if (!catto_parseExpressionLeaf(currentTokenPtr, &child)) {
+            return CATTO_NULL;
+        }
+    }
+
+    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_UNARY_EXPRESSION, currentAstNodePtr);
+
+    astNode->value.asUnaryExpression.child = child;
+    astNode->value.asUnaryExpression.operator = operator->value.asString;
+
+    return astNode;
+}
+
 catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
     if (!*currentTokenPtr) {
         return CATTO_NULL;
@@ -101,7 +159,19 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
     catto_AstNode* currentChild = CATTO_NULL;
 
     while (CATTO_TRUE) {
-        if (operatorPrecedence[operatorPrecedenceLevel + 1]) {
+        if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_BRACKET)) {
+            if (!catto_parseExpression(currentTokenPtr, &currentChild)) {
+                return CATTO_NULL;
+            }
+
+            if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_BRACKET)) {
+                return CATTO_NULL;
+            }
+        } else if (*currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR) {
+            if (!catto_parseUnaryExpression(currentTokenPtr, &currentChild)) {
+                return CATTO_NULL;
+            }
+        } else if (operatorPrecedence[operatorPrecedenceLevel + 1]) {
             if (!catto_parseBinaryExpression(operatorPrecedenceLevel + 1, currentTokenPtr, &currentChild)) {
                 return CATTO_NULL;
             }
@@ -237,6 +307,16 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 CATTO_LOG_CHAR('(');
 
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
+
+                CATTO_LOG_CHAR(')');
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_UNARY_EXPRESSION:
+                CATTO_LOG(currentAstNode->value.asUnaryExpression.operator);
+                CATTO_LOG_CHAR('(');
+
+                catto_debugAstNodes(currentAstNode->value.asUnaryExpression.child);
 
                 CATTO_LOG_CHAR(')');
 

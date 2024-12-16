@@ -20,7 +20,9 @@ int main(int argc, char* argv[]) {
         "10 print\n"
         "20 print 123\n"
         "30 print \"hello\", 456 + 789 * 12, \"world\"\n"
-        "40 print 10 - 9 - 8 - 7 - 6"
+        "40 print 10 - 9 - 8 - 7 - 6\n"
+        "50 print 6 * (4 + 5)\n"
+        "60 print -5, 6 + 5 * -3, -(2 + 4)\n"
     );
 
     printf("Tokens: ");
