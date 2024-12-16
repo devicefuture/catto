@@ -28,7 +28,9 @@ include src/config.h
 include src/common.h
 include src/declarations.h
 include src/contexts.h
+include src/numbers.h
 include src/strings.h
+include src/datatypes.h
 include src/tokeniser.h
 include src/parser.h
 

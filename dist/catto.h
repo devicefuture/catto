@@ -16,6 +16,8 @@
 #define CATTO_INT int
 #define CATTO_FLOAT float
 
+#define CATTO_MAX_PRECISION 6
+
 #endif
 
 #define CATTO_USE_STDLIB
@@ -77,6 +79,10 @@ typedef CATTO_FLOAT catto_Float;
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
+    struct catto_AstNode* firstParsedStatement;
+    struct catto_AstNode* nextParsedStatement;
+    struct catto_AstNode* firstParsedArgument;
+    struct catto_AstNode* nextParsedArgument;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
@@ -168,11 +174,18 @@ catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 
+catto_Char* catto_numberToString(catto_Float number);
+
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
 catto_Char* catto_copyString(catto_Char* string);
+catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
+catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
+catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+
+catto_Char* catto_asString(catto_TypedValue value);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
@@ -188,6 +201,10 @@ catto_Context* catto_newContext() {
 
     context->firstCommandHandler = CATTO_NULL;
     context->lastCommandHandler = CATTO_NULL;
+    context->firstParsedStatement = CATTO_NULL;
+    context->nextParsedStatement = CATTO_NULL;
+    context->firstParsedArgument = CATTO_NULL;
+    context->nextParsedArgument = CATTO_NULL;
 
     return context;
 }
@@ -210,12 +227,256 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     }
 }
 
+catto_Bool catto_hasNextArg(catto_Context* context) {
+    return !!context->nextParsedArgument;
+}
+
+catto_TypedValue catto_evalNextArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+
+    catto_TypedValue returnValue = (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_NUMBER,
+        .value.asNumber = 0
+    };
+
+    if (!currentArgument) {
+        return returnValue;
+    }
+
+    if (currentArgument->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        if (currentArgument->value.asExpressionLeaf.value) {
+            returnValue = *(currentArgument->value.asExpressionLeaf.value);
+        }
+    }
+
+    context->nextParsedArgument = currentArgument->nextAstNode;
+
+    return returnValue;
+}
+
+catto_Bool catto_step(catto_Context* context) {
+    if (!context->nextParsedStatement) {
+        return CATTO_FALSE;
+    }
+
+    catto_AstNode* currentStatement = context->nextParsedStatement;
+
+    context->nextParsedStatement = currentStatement->nextAstNode;
+    context->firstParsedArgument = currentStatement->value.asStatement.firstArgument;
+    context->nextParsedArgument = context->firstParsedArgument;
+
+    switch (currentStatement->type) {
+        case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
+            catto_CommandHandlerFunction function = currentStatement->value.asStatement.attributes.asCommandHandler->function;
+
+            if (!function) {
+                return CATTO_FALSE;
+            }
+
+            function(context);
+
+            break;
+
+        default:
+            return CATTO_FALSE;
+    }
+
+    return !!context->nextParsedStatement;
+}
+
+void catto_load(catto_Context* context, catto_Char* code) {
+    catto_Token* firstToken = catto_tokenise(context, code);
+    catto_AstNode* firstAstNode = catto_parse(firstToken);
+
+    context->firstParsedStatement = firstAstNode;
+    context->nextParsedStatement = firstAstNode;
+}
+
+void catto_run(catto_Context* context) {
+    while (catto_step(context)) {}
+}
+
 void catto_command_print(catto_Context* context) {
-    CATTO_LOG("Print\n");
+    while (catto_hasNextArg(context)) {
+        catto_Char* string = catto_asString(catto_evalNextArg(context));
+
+        CATTO_LOG(string);
+        CATTO_FREE(string);
+
+        if (catto_hasNextArg(context)) {
+            CATTO_LOG(" ");
+        }
+    }
+
+    CATTO_LOG("\n");
 }
 
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
+}
+
+// src/numbers.h
+
+catto_Float catto_power(catto_Float base, catto_Int power) {
+    if (power == 0) {
+        return 1;
+    }
+
+    if (power < 0) {
+        base = 1 / base;
+        power *= -1;
+    }
+
+    catto_Float result = base;
+
+    while (power > 1) {
+        result *= base;
+        power--;
+    }
+
+    return result;
+}
+
+catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    catto_Int integralPart = number;
+    catto_Count integralDigits = 0;
+
+    while (integralPart > 0) {
+        integralPart /= 10;
+        integralDigits++;
+    }
+
+    precision -= integralDigits;
+
+    if (precision < 0) {
+        precision = 0;
+    }
+
+    catto_Int multiplier = catto_power(10, precision);
+
+    number += 0.5 * catto_power(10, -precision);
+
+    if (isNegative) {
+        number *= -1;
+    }
+
+    return (catto_Float)((catto_Int)(number * multiplier)) / multiplier;
+}
+
+catto_Char* catto_numberToString(catto_Float number) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    if (number == CATTO_NAN) {
+        return catto_copyString("NaN");
+    }
+
+    if (number == CATTO_INFINITY) {
+        return catto_copyString(isNegative ? "-Infinity" : "Infinity");
+    }
+
+    catto_Int exponent = 0;
+    catto_Char* string = catto_copyString("");
+    catto_Count precisionLeft = CATTO_MAX_PRECISION;
+
+    if (number > 0) {
+        if (number < catto_power(10, -CATTO_MAX_PRECISION + 1)) {
+            while (number < 1 - catto_power(10, -CATTO_MAX_PRECISION)) {
+                number *= 10;
+                exponent--;
+            }
+        }
+
+        if (number > catto_power(10, CATTO_MAX_PRECISION - 1)) {
+            while (number > 10 + catto_power(10, -CATTO_MAX_PRECISION)) {
+                number /= 10;
+                exponent++;
+            }
+        }
+    }
+
+    number = catto_roundToPrecision(number, CATTO_MAX_PRECISION);
+
+    catto_Int integralPart = number;
+
+    number += 0.1 * catto_power(10, -precisionLeft);
+    number -= integralPart; // Now fractional part
+
+    do {
+        catto_appendCharToString(string, (catto_Char)('0' + (integralPart % 10)));
+
+        integralPart /= 10;
+        precisionLeft--;
+    } while (integralPart > 0);
+
+    if (isNegative) {
+        catto_appendCharToString(string, '-');
+    }
+
+    catto_reverseString(string);
+
+    catto_Count trailingZeroes = 0;
+    catto_Bool anyDigitsInFractionalPart = CATTO_FALSE;
+
+    if (number > 0 && precisionLeft > 0) {
+        catto_appendCharToString(string, '.');
+
+        while (number > 0 && precisionLeft > 0) {
+            number *= 10;
+
+            catto_Char digit = number;
+
+            if (digit == 0) {
+                trailingZeroes++;
+            } else {
+                trailingZeroes = 0;
+                anyDigitsInFractionalPart = CATTO_TRUE;
+            }
+
+            catto_appendCharToString(string, (catto_Char)('0' + digit));
+
+            number -= digit;
+            precisionLeft--;
+        }
+    }
+
+    if (trailingZeroes > 0) {
+        if (!anyDigitsInFractionalPart) {
+            trailingZeroes++;
+        }
+
+        catto_Count newStringLength = catto_stringLength(string) - trailingZeroes;
+
+        string = CATTO_REALLOC(string, newStringLength + 1);
+        string[newStringLength] = '\0';
+    }
+
+    if (exponent != 0) {
+        catto_appendCharToString(string, 'E');
+
+        if (exponent > 0) {
+            catto_appendCharToString(string, '+');
+        }
+
+        catto_Char* exponentString = catto_numberToString(exponent);
+
+        catto_appendToString(string, exponentString);
+
+        CATTO_FREE(exponentString);
+    }
+
+    return string;
 }
 
 // src/strings.h
@@ -270,6 +531,43 @@ catto_Char* catto_copyString(catto_Char* string) {
     newString[length] = '\0';
 
     return newString;
+}
+
+catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
+    catto_Count length = catto_stringLength(string);
+
+    string = CATTO_REALLOC(string, length + 2);
+    string[length] = character;
+    string[length + 1] = '\0';
+
+    return string;
+}
+
+catto_Char* catto_appendToString(catto_Char* a, catto_Char* b) {
+    catto_Count aLength = catto_stringLength(a);
+    catto_Count bLength = catto_stringLength(b);
+
+    a = CATTO_REALLOC(a, aLength + bLength + 1);
+    a[aLength + bLength] = '\0';
+
+    for (catto_Count i = 0; i < bLength; i++) {
+        a[aLength + i] = b[i];
+    }
+
+    return a;
+}
+
+catto_Char* catto_reverseString(catto_Char* string) {
+    catto_Char* tempString = catto_copyString(string);
+    catto_Count stringLength = catto_stringLength(string);
+
+    for (catto_Count i = 0; i < stringLength; i++) {
+        string[stringLength - 1 - i] = tempString[i];
+    }
+
+    CATTO_FREE(tempString);
+
+    return string;
 }
 
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
@@ -376,6 +674,20 @@ catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charac
 }
 
 #endif
+
+// src/datatypes.h
+
+catto_Char* catto_asString(catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_NUMBER) {
+        return catto_numberToString(value.value.asNumber);
+    }
+
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        return catto_copyString(value.value.asString);
+    }
+
+    return catto_copyString("");
+}
 
 // src/tokeniser.h
 

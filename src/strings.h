@@ -50,6 +50,43 @@ catto_Char* catto_copyString(catto_Char* string) {
     return newString;
 }
 
+catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
+    catto_Count length = catto_stringLength(string);
+
+    string = CATTO_REALLOC(string, length + 2);
+    string[length] = character;
+    string[length + 1] = '\0';
+
+    return string;
+}
+
+catto_Char* catto_appendToString(catto_Char* a, catto_Char* b) {
+    catto_Count aLength = catto_stringLength(a);
+    catto_Count bLength = catto_stringLength(b);
+
+    a = CATTO_REALLOC(a, aLength + bLength + 1);
+    a[aLength + bLength] = '\0';
+
+    for (catto_Count i = 0; i < bLength; i++) {
+        a[aLength + i] = b[i];
+    }
+
+    return a;
+}
+
+catto_Char* catto_reverseString(catto_Char* string) {
+    catto_Char* tempString = catto_copyString(string);
+    catto_Count stringLength = catto_stringLength(string);
+
+    for (catto_Count i = 0; i < stringLength; i++) {
+        string[stringLength - 1 - i] = tempString[i];
+    }
+
+    CATTO_FREE(tempString);
+
+    return string;
+}
+
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
     catto_Count i = 0;
 

@@ -1,0 +1,161 @@
+catto_Float catto_power(catto_Float base, catto_Int power) {
+    if (power == 0) {
+        return 1;
+    }
+
+    if (power < 0) {
+        base = 1 / base;
+        power *= -1;
+    }
+
+    catto_Float result = base;
+
+    while (power > 1) {
+        result *= base;
+        power--;
+    }
+
+    return result;
+}
+
+catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    catto_Int integralPart = number;
+    catto_Count integralDigits = 0;
+
+    while (integralPart > 0) {
+        integralPart /= 10;
+        integralDigits++;
+    }
+
+    precision -= integralDigits;
+
+    if (precision < 0) {
+        precision = 0;
+    }
+
+    catto_Int multiplier = catto_power(10, precision);
+
+    number += 0.5 * catto_power(10, -precision);
+
+    if (isNegative) {
+        number *= -1;
+    }
+
+    return (catto_Float)((catto_Int)(number * multiplier)) / multiplier;
+}
+
+catto_Char* catto_numberToString(catto_Float number) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    if (number == CATTO_NAN) {
+        return catto_copyString("NaN");
+    }
+
+    if (number == CATTO_INFINITY) {
+        return catto_copyString(isNegative ? "-Infinity" : "Infinity");
+    }
+
+    catto_Int exponent = 0;
+    catto_Char* string = catto_copyString("");
+    catto_Count precisionLeft = CATTO_MAX_PRECISION;
+
+    if (number > 0) {
+        if (number < catto_power(10, -CATTO_MAX_PRECISION + 1)) {
+            while (number < 1 - catto_power(10, -CATTO_MAX_PRECISION)) {
+                number *= 10;
+                exponent--;
+            }
+        }
+
+        if (number > catto_power(10, CATTO_MAX_PRECISION - 1)) {
+            while (number > 10 + catto_power(10, -CATTO_MAX_PRECISION)) {
+                number /= 10;
+                exponent++;
+            }
+        }
+    }
+
+    number = catto_roundToPrecision(number, CATTO_MAX_PRECISION);
+
+    catto_Int integralPart = number;
+
+    number += 0.1 * catto_power(10, -precisionLeft);
+    number -= integralPart; // Now fractional part
+
+    do {
+        catto_appendCharToString(string, (catto_Char)('0' + (integralPart % 10)));
+
+        integralPart /= 10;
+        precisionLeft--;
+    } while (integralPart > 0);
+
+    if (isNegative) {
+        catto_appendCharToString(string, '-');
+    }
+
+    catto_reverseString(string);
+
+    catto_Count trailingZeroes = 0;
+    catto_Bool anyDigitsInFractionalPart = CATTO_FALSE;
+
+    if (number > 0 && precisionLeft > 0) {
+        catto_appendCharToString(string, '.');
+
+        while (number > 0 && precisionLeft > 0) {
+            number *= 10;
+
+            catto_Char digit = number;
+
+            if (digit == 0) {
+                trailingZeroes++;
+            } else {
+                trailingZeroes = 0;
+                anyDigitsInFractionalPart = CATTO_TRUE;
+            }
+
+            catto_appendCharToString(string, (catto_Char)('0' + digit));
+
+            number -= digit;
+            precisionLeft--;
+        }
+    }
+
+    if (trailingZeroes > 0) {
+        if (!anyDigitsInFractionalPart) {
+            trailingZeroes++;
+        }
+
+        catto_Count newStringLength = catto_stringLength(string) - trailingZeroes;
+
+        string = CATTO_REALLOC(string, newStringLength + 1);
+        string[newStringLength] = '\0';
+    }
+
+    if (exponent != 0) {
+        catto_appendCharToString(string, 'E');
+
+        if (exponent > 0) {
+            catto_appendCharToString(string, '+');
+        }
+
+        catto_Char* exponentString = catto_numberToString(exponent);
+
+        catto_appendToString(string, exponentString);
+
+        CATTO_FREE(exponentString);
+    }
+
+    return string;
+}

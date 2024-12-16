@@ -11,6 +11,8 @@
 #define CATTO_INT int
 #define CATTO_FLOAT float
 
+#define CATTO_MAX_PRECISION 6
+
 #endif
 
 #define CATTO_USE_STDLIB

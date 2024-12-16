@@ -1,6 +1,10 @@
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
+    struct catto_AstNode* firstParsedStatement;
+    struct catto_AstNode* nextParsedStatement;
+    struct catto_AstNode* firstParsedArgument;
+    struct catto_AstNode* nextParsedArgument;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
@@ -92,11 +96,18 @@ catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 
+catto_Char* catto_numberToString(catto_Float number);
+
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
 catto_Char* catto_copyString(catto_Char* string);
+catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
+catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
+catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+
+catto_Char* catto_asString(catto_TypedValue value);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);

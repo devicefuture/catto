@@ -41,6 +41,14 @@ int main(int argc, char* argv[]) {
     catto_debugAstNodes(firstAstNode);
     printf("\n");
 
+    catto_load(
+        context,
+        "10 print \"Hello, world!\"\n"
+        "20 print 1, 2, 3, 4.59e-8"
+    );
+
+    catto_run(context);
+
     printf("It works!\n");
 
     return 0;
