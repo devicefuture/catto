@@ -27,6 +27,7 @@ EOF
 include src/config.h
 include src/common.h
 include src/declarations.h
+include src/operators.h
 include src/contexts.h
 include src/numbers.h
 include src/strings.h

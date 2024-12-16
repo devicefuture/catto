@@ -33,23 +33,49 @@ catto_Bool catto_hasNextArg(catto_Context* context) {
     return !!context->nextParsedArgument;
 }
 
-catto_TypedValue catto_evalNextArg(catto_Context* context) {
-    catto_AstNode* currentArgument = context->nextParsedArgument;
-
-    catto_TypedValue returnValue = (catto_TypedValue) {
+catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode) {
+    const catto_TypedValue DEFAULT_RETURN_VALUE = (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_NUMBER,
         .value.asNumber = 0
     };
 
-    if (!currentArgument) {
-        return returnValue;
+    if (!astNode) {
+        return DEFAULT_RETURN_VALUE;
     }
 
-    if (currentArgument->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        if (currentArgument->value.asExpressionLeaf.value) {
-            returnValue = *(currentArgument->value.asExpressionLeaf.value);
+    if (astNode->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        if (astNode->value.asExpressionLeaf.value) {
+            return *(astNode->value.asExpressionLeaf.value);
         }
     }
+
+    if (astNode->type == CATTO_AST_NODE_TYPE_UNARY_EXPRESSION) {
+        catto_Char* operator = astNode->value.asUnaryExpression.operator;
+        catto_Count i = 0;
+
+        while (catto_operatorMappings[i].operator) {
+            catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[i];
+
+            if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+                catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
+
+                if (function) {
+                    return function(catto_evalExpression(context, astNode->value.asUnaryExpression.child));
+                }
+
+                return DEFAULT_RETURN_VALUE;
+            }
+
+            i++;
+        }
+    }
+
+    return DEFAULT_RETURN_VALUE;
+}
+
+catto_TypedValue catto_evalNextArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_TypedValue returnValue = catto_evalExpression(context, currentArgument);
 
     context->nextParsedArgument = currentArgument->nextAstNode;
 

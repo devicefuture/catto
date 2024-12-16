@@ -92,6 +92,15 @@ typedef struct catto_AstNode {
     struct catto_AstNode* nextAstNode;
 } catto_AstNode;
 
+typedef catto_TypedValue (*catto_UnaryOperatorFunction)(catto_TypedValue value);
+typedef catto_TypedValue (*catto_BinaryOperatorFunction)(catto_TypedValue a, catto_TypedValue b);
+
+typedef struct catto_OperatorMapping {
+    catto_Char* operator;
+    catto_UnaryOperatorFunction unaryFunction;
+    catto_BinaryOperatorFunction binaryFunction;
+} catto_OperatorMapping;
+
 catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
@@ -105,9 +114,12 @@ catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
 
+catto_Float catto_asNumber(catto_TypedValue value);
+catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
+catto_TypedValue catto_asTypedString(catto_Char* value);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);

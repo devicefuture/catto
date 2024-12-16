@@ -1,22 +1,3 @@
-catto_Char** operatorPrecedence[] = {
-    (catto_Char*[]) {"+", "-", CATTO_NULL},
-    (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
-    (catto_Char*[]) {"^", CATTO_NULL},
-    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
-    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
-    (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
-    (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
-    (catto_Char*[]) {";", CATTO_NULL},
-    CATTO_NULL
-};
-
-catto_Char* unaryOperators[] = {
-    "+",
-    "-",
-    "not",
-    CATTO_NULL
-};
-
 catto_Token* catto_eat(catto_Token** currentTokenPtr) {
     if (!*currentTokenPtr) {
         return CATTO_NULL;
@@ -117,7 +98,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 }
 
 catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Count level) {
-    catto_Char** operatorsAtLevel = operatorPrecedence[level];
+    catto_Char** operatorsAtLevel = catto_operatorPrecedence[level];
 
     if (!operatorsAtLevel || !token || token->type != CATTO_TOKEN_TYPE_OPERATOR) {
         return CATTO_FALSE;
@@ -150,8 +131,8 @@ catto_AstNode* catto_parseUnaryExpression(catto_Token** currentTokenPtr, catto_A
     catto_Count i = 0;
     catto_Bool operatorIsUnary = CATTO_FALSE;
 
-    while (unaryOperators[i]) {
-        if (catto_stringsEqual(unaryOperators[i], operator->value.asString)) {
+    while (catto_unaryOperators[i]) {
+        if (catto_stringsEqual(catto_unaryOperators[i], operator->value.asString)) {
             operatorIsUnary = CATTO_TRUE;
             break;
         }
@@ -213,7 +194,7 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
             if (!catto_parseUnaryExpression(currentTokenPtr, &currentChild)) {
                 return CATTO_NULL;
             }
-        } else if (operatorPrecedence[operatorPrecedenceLevel + 1]) {
+        } else if (catto_operatorPrecedence[operatorPrecedenceLevel + 1]) {
             if (!catto_parseBinaryExpression(operatorPrecedenceLevel + 1, currentTokenPtr, &currentChild)) {
                 return CATTO_NULL;
             }

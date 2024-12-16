@@ -114,7 +114,7 @@ catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
 }
 
 // @source https://stackoverflow.com/a/4392789
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
 
     catto_Count i = 0;
@@ -188,6 +188,29 @@ catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charac
     *charactersEaten = i;
 
     return result * factor;
+}
+
+catto_Float catto_stringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+    catto_Bool ateSign = CATTO_FALSE;
+    catto_Bool negate = CATTO_FALSE;
+
+    if (string[0] == '+' || string[0] == '-') {
+        negate = string[0] == '-';
+        ateSign = CATTO_TRUE;
+        string += 1;
+    }
+
+    catto_Float result = catto_unsignedStringToNumber(string, charactersEaten);
+
+    if (ateSign) {
+        (*charactersEaten)++;
+    }
+
+    if (negate) {
+        result *= -1;
+    }
+
+    return result;
 }
 
 #endif

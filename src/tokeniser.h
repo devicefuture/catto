@@ -1,19 +1,6 @@
 #ifndef CATTO_TOKENISER_H_
 #define CATTO_TOKENISER_H_
 
-catto_Char* operators[] = {
-    "+", "-", "*", "/", "^", "div", "mod", "&", "|", "~",
-    "!=", "<=", ">=", "=", "<", ">",
-    "and", "or", "xor", "not",
-    ";",
-    CATTO_NULL
-};
-
-catto_Char* commands[] = {
-    "print",
-    CATTO_NULL
-};
-
 catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr) {
     catto_Token* token = CATTO_NEW(catto_Token);
 
@@ -115,7 +102,7 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
 
 catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count charactersEaten = 0;
-    catto_Float number = catto_stringToPositiveNumber(code + *indexPtr, &charactersEaten);
+    catto_Float number = catto_unsignedStringToNumber(code + *indexPtr, &charactersEaten);
 
     if (number == CATTO_NAN) {
         return CATTO_NULL;
@@ -292,7 +279,7 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
             continue;
         }
 

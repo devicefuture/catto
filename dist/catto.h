@@ -170,6 +170,15 @@ typedef struct catto_AstNode {
     struct catto_AstNode* nextAstNode;
 } catto_AstNode;
 
+typedef catto_TypedValue (*catto_UnaryOperatorFunction)(catto_TypedValue value);
+typedef catto_TypedValue (*catto_BinaryOperatorFunction)(catto_TypedValue a, catto_TypedValue b);
+
+typedef struct catto_OperatorMapping {
+    catto_Char* operator;
+    catto_UnaryOperatorFunction unaryFunction;
+    catto_BinaryOperatorFunction binaryFunction;
+} catto_OperatorMapping;
+
 catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
@@ -183,9 +192,12 @@ catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
 
+catto_Float catto_asNumber(catto_TypedValue value);
+catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
+catto_TypedValue catto_asTypedString(catto_Char* value);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
@@ -193,6 +205,54 @@ void catto_debugTokens(catto_Token* firstToken);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
+
+// src/operators.h
+
+catto_Char* catto_operators[] = {
+    "+", "-", "*", "/", "^", "div", "mod", "&", "|", "~",
+    "!=", "<=", ">=", "=", "<", ">",
+    "and", "or", "xor", "not",
+    ";",
+    CATTO_NULL
+};
+
+catto_Char** catto_operatorPrecedence[] = {
+    (catto_Char*[]) {"+", "-", CATTO_NULL},
+    (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
+    (catto_Char*[]) {"^", CATTO_NULL},
+    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
+    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
+    (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
+    (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
+    (catto_Char*[]) {";", CATTO_NULL},
+    CATTO_NULL
+};
+
+catto_Char* catto_unaryOperators[] = {
+    "+",
+    "-",
+    "not",
+    CATTO_NULL
+};
+
+catto_TypedValue catto_unary_add(catto_TypedValue value) {
+    return catto_asTypedNumber(catto_asNumber(value));
+}
+
+catto_TypedValue catto_unary_subtract(catto_TypedValue value) {
+    return catto_asTypedNumber(-catto_asNumber(value));
+}
+
+catto_TypedValue catto_unary_not(catto_TypedValue value) {
+    return catto_asTypedNumber(catto_asNumber(value) ? 0 : 1);
+}
+
+catto_OperatorMapping catto_operatorMappings[] = {
+    {"+", catto_unary_add, CATTO_NULL},
+    {"-", catto_unary_subtract, CATTO_NULL},
+    {"not", catto_unary_not, CATTO_NULL},
+    {CATTO_NULL, CATTO_NULL, CATTO_NULL}
+};
 
 // src/contexts.h
 
@@ -231,23 +291,49 @@ catto_Bool catto_hasNextArg(catto_Context* context) {
     return !!context->nextParsedArgument;
 }
 
-catto_TypedValue catto_evalNextArg(catto_Context* context) {
-    catto_AstNode* currentArgument = context->nextParsedArgument;
-
-    catto_TypedValue returnValue = (catto_TypedValue) {
+catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode) {
+    const catto_TypedValue DEFAULT_RETURN_VALUE = (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_NUMBER,
         .value.asNumber = 0
     };
 
-    if (!currentArgument) {
-        return returnValue;
+    if (!astNode) {
+        return DEFAULT_RETURN_VALUE;
     }
 
-    if (currentArgument->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        if (currentArgument->value.asExpressionLeaf.value) {
-            returnValue = *(currentArgument->value.asExpressionLeaf.value);
+    if (astNode->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        if (astNode->value.asExpressionLeaf.value) {
+            return *(astNode->value.asExpressionLeaf.value);
         }
     }
+
+    if (astNode->type == CATTO_AST_NODE_TYPE_UNARY_EXPRESSION) {
+        catto_Char* operator = astNode->value.asUnaryExpression.operator;
+        catto_Count i = 0;
+
+        while (catto_operatorMappings[i].operator) {
+            catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[i];
+
+            if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+                catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
+
+                if (function) {
+                    return function(catto_evalExpression(context, astNode->value.asUnaryExpression.child));
+                }
+
+                return DEFAULT_RETURN_VALUE;
+            }
+
+            i++;
+        }
+    }
+
+    return DEFAULT_RETURN_VALUE;
+}
+
+catto_TypedValue catto_evalNextArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_TypedValue returnValue = catto_evalExpression(context, currentArgument);
 
     context->nextParsedArgument = currentArgument->nextAstNode;
 
@@ -597,7 +683,7 @@ catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
 }
 
 // @source https://stackoverflow.com/a/4392789
-catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
 
     catto_Count i = 0;
@@ -673,9 +759,53 @@ catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charac
     return result * factor;
 }
 
+catto_Float catto_stringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+    catto_Bool ateSign = CATTO_FALSE;
+    catto_Bool negate = CATTO_FALSE;
+
+    if (string[0] == '+' || string[0] == '-') {
+        negate = string[0] == '-';
+        ateSign = CATTO_TRUE;
+        string += 1;
+    }
+
+    catto_Float result = catto_unsignedStringToNumber(string, charactersEaten);
+
+    if (ateSign) {
+        (*charactersEaten)++;
+    }
+
+    if (negate) {
+        result *= -1;
+    }
+
+    return result;
+}
+
 #endif
 
 // src/datatypes.h
+
+catto_Float catto_asNumber(catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_NUMBER) {
+        return value.value.asNumber;
+    }
+
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        catto_Count charactersEaten = 0;
+
+        return catto_stringToNumber(value.value.asString, &charactersEaten);
+    }
+
+    return 0;
+}
+
+catto_TypedValue catto_asTypedNumber(catto_Float value) {
+    return (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_NUMBER,
+        .value.asNumber = value
+    };
+}
 
 catto_Char* catto_asString(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_NUMBER) {
@@ -689,23 +819,17 @@ catto_Char* catto_asString(catto_TypedValue value) {
     return catto_copyString("");
 }
 
+catto_TypedValue catto_asTypedString(catto_Char* value) {
+    return (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_STRING,
+        .value.asString = catto_copyString(value)
+    };
+}
+
 // src/tokeniser.h
 
 #ifndef CATTO_TOKENISER_H_
 #define CATTO_TOKENISER_H_
-
-catto_Char* operators[] = {
-    "+", "-", "*", "/", "^", "div", "mod", "&", "|", "~",
-    "!=", "<=", ">=", "=", "<", ">",
-    "and", "or", "xor", "not",
-    ";",
-    CATTO_NULL
-};
-
-catto_Char* commands[] = {
-    "print",
-    CATTO_NULL
-};
 
 catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr) {
     catto_Token* token = CATTO_NEW(catto_Token);
@@ -808,7 +932,7 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
 
 catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count charactersEaten = 0;
-    catto_Float number = catto_stringToPositiveNumber(code + *indexPtr, &charactersEaten);
+    catto_Float number = catto_unsignedStringToNumber(code + *indexPtr, &charactersEaten);
 
     if (number == CATTO_NAN) {
         return CATTO_NULL;
@@ -985,7 +1109,7 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
             continue;
         }
 
@@ -1030,25 +1154,6 @@ void catto_debugTokens(catto_Token* firstToken) {
 #endif
 
 // src/parser.h
-
-catto_Char** operatorPrecedence[] = {
-    (catto_Char*[]) {"+", "-", CATTO_NULL},
-    (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
-    (catto_Char*[]) {"^", CATTO_NULL},
-    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
-    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
-    (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
-    (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
-    (catto_Char*[]) {";", CATTO_NULL},
-    CATTO_NULL
-};
-
-catto_Char* unaryOperators[] = {
-    "+",
-    "-",
-    "not",
-    CATTO_NULL
-};
 
 catto_Token* catto_eat(catto_Token** currentTokenPtr) {
     if (!*currentTokenPtr) {
@@ -1150,7 +1255,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 }
 
 catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Count level) {
-    catto_Char** operatorsAtLevel = operatorPrecedence[level];
+    catto_Char** operatorsAtLevel = catto_operatorPrecedence[level];
 
     if (!operatorsAtLevel || !token || token->type != CATTO_TOKEN_TYPE_OPERATOR) {
         return CATTO_FALSE;
@@ -1183,8 +1288,8 @@ catto_AstNode* catto_parseUnaryExpression(catto_Token** currentTokenPtr, catto_A
     catto_Count i = 0;
     catto_Bool operatorIsUnary = CATTO_FALSE;
 
-    while (unaryOperators[i]) {
-        if (catto_stringsEqual(unaryOperators[i], operator->value.asString)) {
+    while (catto_unaryOperators[i]) {
+        if (catto_stringsEqual(catto_unaryOperators[i], operator->value.asString)) {
             operatorIsUnary = CATTO_TRUE;
             break;
         }
@@ -1246,7 +1351,7 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
             if (!catto_parseUnaryExpression(currentTokenPtr, &currentChild)) {
                 return CATTO_NULL;
             }
-        } else if (operatorPrecedence[operatorPrecedenceLevel + 1]) {
+        } else if (catto_operatorPrecedence[operatorPrecedenceLevel + 1]) {
             if (!catto_parseBinaryExpression(operatorPrecedenceLevel + 1, currentTokenPtr, &currentChild)) {
                 return CATTO_NULL;
             }
