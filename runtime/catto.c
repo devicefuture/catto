@@ -4,7 +4,7 @@
 #include <catto-config.h>
 #include <catto.h>
 
-#define DEBUG_MEMORY
+// #define DEBUG_MEMORY
 
 typedef struct Line {
     unsigned int lineNumber;
