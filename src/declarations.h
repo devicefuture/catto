@@ -68,6 +68,7 @@ typedef struct catto_Variable {
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
+    CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT = '=',
     CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
     CATTO_AST_NODE_TYPE_UNARY_EXPRESSION = '-',
     CATTO_AST_NODE_TYPE_BINARY_EXPRESSION = '+'
@@ -81,6 +82,10 @@ typedef struct catto_AstNode {
             struct catto_AstNode* firstArgument;
             union {
                 catto_CommandHandler* asCommandHandler;
+                struct {
+                    catto_Char* subjectVariable;
+                    struct catto_AstNode* index;
+                } asAssignee;
             } attributes;
         } asStatement;
         struct {
@@ -113,6 +118,7 @@ catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
+void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_TypedValue catto_evalNextArg(catto_Context* context);

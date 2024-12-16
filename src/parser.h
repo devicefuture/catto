@@ -264,35 +264,70 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         return CATTO_NULL;
     }
 
-    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
-
-    astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
-
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
 
-    if (!commandToken) {
-        return CATTO_NULL;
-    }
+    if (commandToken) {
+        catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
 
-    astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
+        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
 
-    catto_AstNode* firstArgument = CATTO_NULL;
-    catto_AstNode* currentArgument = CATTO_NULL;
+        catto_AstNode* firstArgument = CATTO_NULL;
+        catto_AstNode* currentArgument = CATTO_NULL;
 
-    while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
-        if (!firstArgument) {
-            firstArgument = currentArgument;
+        while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
+            if (!firstArgument) {
+                firstArgument = currentArgument;
+            }
+
+            if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
+                break;
+            }
         }
 
-        if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
-            break;
-        }
+        astNode->value.asStatement.firstArgument = firstArgument;
+
+        return astNode;
     }
 
-    astNode->value.asStatement.firstArgument = firstArgument;
+    catto_Token* identifierToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
-    return astNode;
+    if (identifierToken) {
+        catto_Char* subjectVariable = identifierToken->value.asString;
+        catto_AstNode* index = CATTO_NULL;
+
+        if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
+            catto_parseExpression(currentTokenPtr, &index);
+
+            if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
+                return CATTO_NULL;
+            }
+        }
+
+        catto_Token* assignmentOperatorToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
+
+        if (!assignmentOperatorToken || !catto_stringsEqual(assignmentOperatorToken->value.asString, "=")) {
+            return CATTO_NULL;
+        }
+
+        catto_AstNode* value = CATTO_NULL;
+
+        if (!catto_parseExpression(currentTokenPtr, &value)) {
+            return CATTO_NULL;
+        }
+
+        catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
+
+        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.attributes.asAssignee.subjectVariable = subjectVariable;
+        astNode->value.asStatement.attributes.asAssignee.index = index;
+        astNode->value.asStatement.firstArgument = value;
+
+        return astNode;
+    }
+
+    return CATTO_NULL;
 }
 
 catto_AstNode* catto_parse(catto_Token* firstToken) {

@@ -27,9 +27,9 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
 
     if (context->lastCommandHandler) {
         context->lastCommandHandler->nextCommandHandler = commandHandler;
-    } else {
-        context->lastCommandHandler = commandHandler;
     }
+
+    context->lastCommandHandler = commandHandler;
 }
 
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
@@ -44,6 +44,30 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     }
 
     return CATTO_NULL;
+}
+
+void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value) {
+    catto_TypedValue* existingVariableValue = catto_getVariable(context, name);
+
+    if (existingVariableValue) {
+        *existingVariableValue = value;
+    } else {
+        catto_Variable* variable = CATTO_NEW(catto_Variable);
+
+        variable->name = name;
+        variable->value = value;
+        variable->nextVariable = CATTO_NULL;
+
+        if (!context->firstVariable) {
+            context->firstVariable = variable;
+        }
+        
+        if (context->lastVariable) {
+            context->lastVariable->nextVariable = variable;
+        }
+
+        context->lastVariable = variable;
+    }
 }
 
 catto_Bool catto_hasNextArg(catto_Context* context) {
@@ -175,6 +199,14 @@ catto_Bool catto_step(catto_Context* context) {
             }
 
             function(context);
+
+            break;
+
+        case CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT:
+            catto_Char* variableName = currentStatement->value.asStatement.attributes.asAssignee.subjectVariable;
+            catto_TypedValue value = catto_evalExpression(context, currentStatement->value.asStatement.firstArgument);
+
+            catto_setVariable(context, variableName, value);
 
             break;
 
