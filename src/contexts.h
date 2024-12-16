@@ -158,6 +158,20 @@ catto_Bool catto_step(catto_Context* context) {
     return !!context->nextParsedStatement;
 }
 
+void catto_goto(catto_Context* context, catto_Count lineNumber) {
+    catto_AstNode* currentStatement = context->firstParsedStatement;
+
+    while (currentStatement) {
+        if (currentStatement->value.asStatement.lineNumber >= lineNumber) {
+            break;
+        }
+
+        currentStatement = currentStatement->nextAstNode;
+    }
+
+    context->nextParsedStatement = currentStatement;
+}
+
 void catto_load(catto_Context* context, catto_Char* code) {
     catto_Token* firstToken = catto_tokenise(context, code);
     catto_AstNode* firstAstNode = catto_parse(firstToken);
@@ -185,6 +199,17 @@ void catto_command_print(catto_Context* context) {
     CATTO_LOG("\n");
 }
 
+void catto_command_goto(catto_Context* context) {
+    catto_Int lineNumber = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+
+    if (lineNumber < 0) {
+        lineNumber = 0;
+    }
+
+    catto_goto(context, lineNumber);
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
+    catto_addCommand(context, "goto", &catto_command_goto);
 }
