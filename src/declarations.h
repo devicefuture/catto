@@ -1,6 +1,15 @@
 typedef struct catto_Context {
-    catto_Bool isInitialised;
+    struct catto_CommandHandler* firstCommandHandler;
+    struct catto_CommandHandler* lastCommandHandler;
 } catto_Context;
+
+typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
+
+typedef struct catto_CommandHandler {
+    catto_Char* name;
+    catto_CommandHandlerFunction function;
+    struct catto_CommandHandler* nextCommandHandler;
+} catto_CommandHandler;
 
 typedef enum {
     CATTO_TOKEN_TYPE_SYNTAX_ERROR = '\0',
@@ -26,6 +35,7 @@ typedef struct catto_Token {
         catto_Count asLineNumber;
         catto_Float asNumber;
         catto_Char* asString;
+        catto_CommandHandler* asCommandHandler;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
@@ -58,7 +68,7 @@ typedef struct catto_AstNode {
             catto_Count lineNumber;
             struct catto_AstNode* firstArgument;
             union {
-                catto_Char* asCommandName;
+                catto_CommandHandler* asCommandHandler;
             } attributes;
         } asStatement;
         struct {
@@ -79,6 +89,8 @@ typedef struct catto_AstNode {
 } catto_AstNode;
 
 catto_Context* catto_newContext();
+void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
+void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
@@ -86,7 +98,7 @@ catto_Char* catto_copyString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
-catto_Token* catto_tokenise(catto_Char* code);
+catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);

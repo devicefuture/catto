@@ -69,6 +69,27 @@ catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, catto_C
     return token;
 }
 
+catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+    catto_CommandHandler* currentCommandHandler = context->firstCommandHandler;
+
+    while (currentCommandHandler) {
+        if (catto_stringStartsWith(code + index, currentCommandHandler->name)) {
+            catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
+
+            token->value.asCommandHandler = currentCommandHandler;
+
+            *indexPtr = index + catto_stringLength(currentCommandHandler->name);
+
+            return token;
+        }
+
+        currentCommandHandler = currentCommandHandler->nextCommandHandler;
+    }
+
+    return CATTO_NULL;
+}
+
 catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
@@ -220,7 +241,7 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
     return token;
 }
 
-catto_Token* catto_tokenise(catto_Char* code) {
+catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;
@@ -275,7 +296,7 @@ catto_Token* catto_tokenise(catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(commands, CATTO_TOKEN_TYPE_COMMAND, code, &index, &currentToken)) {
+        if (catto_matchCommand(context, code, &index, &currentToken)) {
             continue;
         }
 

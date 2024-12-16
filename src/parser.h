@@ -294,7 +294,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         return CATTO_NULL;
     }
 
-    astNode->value.asStatement.attributes.asCommandName = commandToken->value.asString;
+    astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
 
     catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* currentArgument = CATTO_NULL;
@@ -352,7 +352,7 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandName);
+                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
                 CATTO_LOG_CHAR('(');
 
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);

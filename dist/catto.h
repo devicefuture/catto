@@ -75,8 +75,17 @@ typedef CATTO_FLOAT catto_Float;
 // src/declarations.h
 
 typedef struct catto_Context {
-    catto_Bool isInitialised;
+    struct catto_CommandHandler* firstCommandHandler;
+    struct catto_CommandHandler* lastCommandHandler;
 } catto_Context;
+
+typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
+
+typedef struct catto_CommandHandler {
+    catto_Char* name;
+    catto_CommandHandlerFunction function;
+    struct catto_CommandHandler* nextCommandHandler;
+} catto_CommandHandler;
 
 typedef enum {
     CATTO_TOKEN_TYPE_SYNTAX_ERROR = '\0',
@@ -102,6 +111,7 @@ typedef struct catto_Token {
         catto_Count asLineNumber;
         catto_Float asNumber;
         catto_Char* asString;
+        catto_CommandHandler* asCommandHandler;
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
@@ -134,7 +144,7 @@ typedef struct catto_AstNode {
             catto_Count lineNumber;
             struct catto_AstNode* firstArgument;
             union {
-                catto_Char* asCommandName;
+                catto_CommandHandler* asCommandHandler;
             } attributes;
         } asStatement;
         struct {
@@ -155,6 +165,8 @@ typedef struct catto_AstNode {
 } catto_AstNode;
 
 catto_Context* catto_newContext();
+void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
+void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
@@ -162,7 +174,7 @@ catto_Char* catto_copyString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
-catto_Token* catto_tokenise(catto_Char* code);
+catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
@@ -174,9 +186,36 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode);
 catto_Context* catto_newContext() {
     catto_Context* context = CATTO_NEW(catto_Context);
 
-    context->isInitialised = CATTO_FALSE;
+    context->firstCommandHandler = CATTO_NULL;
+    context->lastCommandHandler = CATTO_NULL;
 
     return context;
+}
+
+void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function) {
+    catto_CommandHandler* commandHandler = CATTO_NEW(catto_CommandHandler);
+
+    commandHandler->name = name;
+    commandHandler->function = function;
+    commandHandler->nextCommandHandler = CATTO_NULL;
+
+    if (!context->firstCommandHandler) {
+        context->firstCommandHandler = commandHandler;
+    }
+
+    if (context->lastCommandHandler) {
+        context->lastCommandHandler->nextCommandHandler = commandHandler;
+    } else {
+        context->lastCommandHandler = commandHandler;
+    }
+}
+
+void catto_command_print(catto_Context* context) {
+    CATTO_LOG("Print\n");
+}
+
+void catto_addContextStandardCommands(catto_Context* context) {
+    catto_addCommand(context, "print", &catto_command_print);
 }
 
 // src/strings.h
@@ -411,6 +450,27 @@ catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, catto_C
     return token;
 }
 
+catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+    catto_CommandHandler* currentCommandHandler = context->firstCommandHandler;
+
+    while (currentCommandHandler) {
+        if (catto_stringStartsWith(code + index, currentCommandHandler->name)) {
+            catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
+
+            token->value.asCommandHandler = currentCommandHandler;
+
+            *indexPtr = index + catto_stringLength(currentCommandHandler->name);
+
+            return token;
+        }
+
+        currentCommandHandler = currentCommandHandler->nextCommandHandler;
+    }
+
+    return CATTO_NULL;
+}
+
 catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
@@ -562,7 +622,7 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
     return token;
 }
 
-catto_Token* catto_tokenise(catto_Char* code) {
+catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;
@@ -617,7 +677,7 @@ catto_Token* catto_tokenise(catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(commands, CATTO_TOKEN_TYPE_COMMAND, code, &index, &currentToken)) {
+        if (catto_matchCommand(context, code, &index, &currentToken)) {
             continue;
         }
 
@@ -727,8 +787,6 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     if (!token) {
         return CATTO_NULL;
     }
-
-    // TODO: Store leaf node's value
 
     catto_TypedValue* value = CATTO_NULL;
     catto_Char* subjectVariable = CATTO_NULL;
@@ -957,7 +1015,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         return CATTO_NULL;
     }
 
-    astNode->value.asStatement.attributes.asCommandName = commandToken->value.asString;
+    astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
 
     catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* currentArgument = CATTO_NULL;
@@ -1015,7 +1073,7 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandName);
+                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
                 CATTO_LOG_CHAR('(');
 
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
