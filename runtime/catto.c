@@ -12,7 +12,7 @@ typedef struct Line {
 Line* firstLine = NULL;
 
 char* assembleLines() {
-    char* code = malloc(sizeof(char));
+    char* code = catto_copyString("");
     Line* currentLine = firstLine;
 
     code[0] = '\0';

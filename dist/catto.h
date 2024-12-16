@@ -492,6 +492,7 @@ void catto_load(catto_Context* context, catto_Char* code) {
 
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
+
 }
 
 void catto_run(catto_Context* context) {
@@ -1585,10 +1586,6 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
     catto_AstNode* currentAstNode = CATTO_NULL;
 
     while (*currentTokenPtr) {
-        if (currentAstNode && !firstAstNode) {
-            firstAstNode = currentAstNode;
-        }
-
         if (catto_parseStatement(currentTokenPtr, &currentAstNode)) {
             while (
                 catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_STATEMENT_DELIMETER) ||
@@ -1598,6 +1595,10 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
             catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, &currentAstNode);
 
             break;
+        }
+
+        if (currentAstNode && !firstAstNode) {
+            firstAstNode = currentAstNode;
         }
     }
 
