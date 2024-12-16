@@ -449,7 +449,13 @@ catto_Bool catto_step(catto_Context* context) {
 
     switch (currentStatement->type) {
         case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-            catto_CommandHandlerFunction function = currentStatement->value.asStatement.attributes.asCommandHandler->function;
+            catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;
+
+            if (!commandHandler) {
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandlerFunction function = commandHandler->function;
 
             if (!function) {
                 return CATTO_FALSE;
@@ -1586,7 +1592,12 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
+                if (currentAstNode->value.asStatement.attributes.asCommandHandler) {
+                    CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
+                } else {
+                    CATTO_LOG("[unkn]");
+                }
+
                 CATTO_LOG_CHAR('(');
 
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);

@@ -333,7 +333,12 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-                CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
+                if (currentAstNode->value.asStatement.attributes.asCommandHandler) {
+                    CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
+                } else {
+                    CATTO_LOG("[unkn]");
+                }
+
                 CATTO_LOG_CHAR('(');
 
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);

@@ -135,7 +135,13 @@ catto_Bool catto_step(catto_Context* context) {
 
     switch (currentStatement->type) {
         case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
-            catto_CommandHandlerFunction function = currentStatement->value.asStatement.attributes.asCommandHandler->function;
+            catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;
+
+            if (!commandHandler) {
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandlerFunction function = commandHandler->function;
 
             if (!function) {
                 return CATTO_FALSE;

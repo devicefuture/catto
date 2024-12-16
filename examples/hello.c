@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
         "40 print 10 - 9 - 8 - 7 - 6\n"
         "50 print 6 * (4 + 5)\n"
         "60 print -5, 6 + 5 * -3, -(2 + 4)\n"
-        "60 print var, var[5], var[2 + 3]\n"
+        "60 print var, var[5], var[2 + 3]"
     );
 
     printf("Tokens: ");
