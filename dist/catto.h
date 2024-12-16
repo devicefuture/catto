@@ -90,7 +90,9 @@ typedef enum {
     CATTO_TOKEN_TYPE_STATEMENT_DELIMETER = ':',
     CATTO_TOKEN_TYPE_OPERATOR = '+',
     CATTO_TOKEN_TYPE_OPENING_BRACKET = '(',
-    CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')'
+    CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')',
+    CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET = '[',
+    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']'
 } catto_TokenType;
 
 typedef struct catto_Token {
@@ -103,6 +105,19 @@ typedef struct catto_Token {
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
+
+typedef enum {
+    CATTO_DATA_TYPE_NUMBER = '%',
+    CATTO_DATA_TYPE_STRING = '$'
+} catto_DataType;
+
+typedef struct catto_TypedValue {
+    catto_DataType type;
+    union {
+        catto_Float asNumber;
+        catto_Char* asString;
+    } value;
+} catto_TypedValue;
 
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
@@ -123,6 +138,11 @@ typedef struct catto_AstNode {
             } attributes;
         } asStatement;
         struct {
+            catto_TypedValue* value;
+            catto_Char* subjectVariable;
+            struct catto_AstNode* index;
+        } asExpressionLeaf;
+        struct {
             struct catto_AstNode* child;
             catto_Char* operator;
         } asUnaryExpression;
@@ -138,6 +158,7 @@ catto_Context* catto_newContext();
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Char* catto_copyString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
@@ -197,6 +218,19 @@ catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
     }
 
     return CATTO_FALSE;
+}
+
+catto_Char* catto_copyString(catto_Char* string) {
+    catto_Count length = catto_stringLength(string);
+    catto_Char* newString = CATTO_MALLOC(length + 1);
+
+    for (catto_Count i = 0; i < length; i++) {
+        newString[i] = string[i];
+    }
+
+    newString[length] = '\0';
+
+    return newString;
 }
 
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
@@ -571,6 +605,14 @@ catto_Token* catto_tokenise(catto_Char* code) {
             continue;
         }
 
+        if (catto_matchChar('[', CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET, code, &index, &currentToken)) {
+            continue;
+        }
+        
+        if (catto_matchChar(']', CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET, code, &index, &currentToken)) {
+            continue;
+        }
+
         if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
             continue;
         }
@@ -686,9 +728,53 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
         return CATTO_NULL;
     }
 
+    // TODO: Store leaf node's value
+
+    catto_TypedValue* value = CATTO_NULL;
+    catto_Char* subjectVariable = CATTO_NULL;
+    catto_AstNode* index = CATTO_NULL;
+
+    switch (token->type) {
+        case CATTO_TOKEN_TYPE_NUMBER:
+            value = CATTO_NEW(catto_TypedValue);
+
+            value->type = CATTO_DATA_TYPE_NUMBER;
+            value->value.asNumber = token->value.asNumber;
+
+            break;
+
+        case CATTO_TOKEN_TYPE_STRING:
+            value = CATTO_NEW(catto_TypedValue);
+
+            value->type = CATTO_DATA_TYPE_STRING;
+            value->value.asString = catto_copyString(token->value.asString);
+
+            break;
+
+        case CATTO_TOKEN_TYPE_IDENTIFIER:
+            subjectVariable = catto_copyString(token->value.asString);
+
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
+                if (!catto_parseExpression(currentTokenPtr, &index)) {
+                    return CATTO_NULL;
+                }
+
+                if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
+                    return CATTO_NULL;
+                }
+            }
+
+            break;
+
+        default:
+            return CATTO_NULL;
+    }
+
     catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXPRESSION_LEAF, currentAstNodePtr);
 
-    // TODO: Store leaf node's value
+    astNode->value.asExpressionLeaf.value = value;
+    astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
+    astNode->value.asExpressionLeaf.index = index;
 
     return astNode;
 }
@@ -918,8 +1004,15 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
 
 void catto_debugAstNodes(catto_AstNode* firstAstNode) {
     catto_AstNode* currentAstNode = firstAstNode;
+    catto_Bool hadFirst = CATTO_FALSE;
 
     while (currentAstNode) {
+        if (hadFirst) {
+            CATTO_LOG_CHAR(' ');
+        } else {
+            hadFirst = CATTO_TRUE;
+        }
+
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandName);
@@ -928,6 +1021,25 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
 
                 CATTO_LOG_CHAR(')');
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_EXPRESSION_LEAF:
+                if (currentAstNode->value.asExpressionLeaf.subjectVariable) {
+                    CATTO_LOG(currentAstNode->value.asExpressionLeaf.subjectVariable);
+                } else if (currentAstNode->value.asExpressionLeaf.value) {
+                    CATTO_LOG_CHAR(currentAstNode->value.asExpressionLeaf.value->type);
+                } else {
+                    CATTO_LOG_CHAR('e');
+                }
+
+                if (currentAstNode->value.asExpressionLeaf.index) {
+                    CATTO_LOG_CHAR('[');
+
+                    catto_debugAstNodes(currentAstNode->value.asExpressionLeaf.index);
+
+                    CATTO_LOG_CHAR(']');
+                }
 
                 break;
 

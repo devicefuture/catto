@@ -67,9 +67,51 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
         return CATTO_NULL;
     }
 
+    catto_TypedValue* value = CATTO_NULL;
+    catto_Char* subjectVariable = CATTO_NULL;
+    catto_AstNode* index = CATTO_NULL;
+
+    switch (token->type) {
+        case CATTO_TOKEN_TYPE_NUMBER:
+            value = CATTO_NEW(catto_TypedValue);
+
+            value->type = CATTO_DATA_TYPE_NUMBER;
+            value->value.asNumber = token->value.asNumber;
+
+            break;
+
+        case CATTO_TOKEN_TYPE_STRING:
+            value = CATTO_NEW(catto_TypedValue);
+
+            value->type = CATTO_DATA_TYPE_STRING;
+            value->value.asString = catto_copyString(token->value.asString);
+
+            break;
+
+        case CATTO_TOKEN_TYPE_IDENTIFIER:
+            subjectVariable = catto_copyString(token->value.asString);
+
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
+                if (!catto_parseExpression(currentTokenPtr, &index)) {
+                    return CATTO_NULL;
+                }
+
+                if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
+                    return CATTO_NULL;
+                }
+            }
+
+            break;
+
+        default:
+            return CATTO_NULL;
+    }
+
     catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXPRESSION_LEAF, currentAstNodePtr);
 
-    // TODO: Store leaf node's value
+    astNode->value.asExpressionLeaf.value = value;
+    astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
+    astNode->value.asExpressionLeaf.index = index;
 
     return astNode;
 }
@@ -299,8 +341,15 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
 
 void catto_debugAstNodes(catto_AstNode* firstAstNode) {
     catto_AstNode* currentAstNode = firstAstNode;
+    catto_Bool hadFirst = CATTO_FALSE;
 
     while (currentAstNode) {
+        if (hadFirst) {
+            CATTO_LOG_CHAR(' ');
+        } else {
+            hadFirst = CATTO_TRUE;
+        }
+
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandName);
@@ -309,6 +358,25 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
 
                 CATTO_LOG_CHAR(')');
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_EXPRESSION_LEAF:
+                if (currentAstNode->value.asExpressionLeaf.subjectVariable) {
+                    CATTO_LOG(currentAstNode->value.asExpressionLeaf.subjectVariable);
+                } else if (currentAstNode->value.asExpressionLeaf.value) {
+                    CATTO_LOG_CHAR(currentAstNode->value.asExpressionLeaf.value->type);
+                } else {
+                    CATTO_LOG_CHAR('e');
+                }
+
+                if (currentAstNode->value.asExpressionLeaf.index) {
+                    CATTO_LOG_CHAR('[');
+
+                    catto_debugAstNodes(currentAstNode->value.asExpressionLeaf.index);
+
+                    CATTO_LOG_CHAR(']');
+                }
 
                 break;
 

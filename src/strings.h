@@ -37,6 +37,19 @@ catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
     return CATTO_FALSE;
 }
 
+catto_Char* catto_copyString(catto_Char* string) {
+    catto_Count length = catto_stringLength(string);
+    catto_Char* newString = CATTO_MALLOC(length + 1);
+
+    for (catto_Count i = 0; i < length; i++) {
+        newString[i] = string[i];
+    }
+
+    newString[length] = '\0';
+
+    return newString;
+}
+
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
     catto_Count i = 0;
 

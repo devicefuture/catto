@@ -263,6 +263,14 @@ catto_Token* catto_tokenise(catto_Char* code) {
             continue;
         }
 
+        if (catto_matchChar('[', CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET, code, &index, &currentToken)) {
+            continue;
+        }
+        
+        if (catto_matchChar(']', CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET, code, &index, &currentToken)) {
+            continue;
+        }
+
         if (catto_matchStrings(operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
             continue;
         }

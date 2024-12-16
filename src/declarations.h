@@ -14,7 +14,9 @@ typedef enum {
     CATTO_TOKEN_TYPE_STATEMENT_DELIMETER = ':',
     CATTO_TOKEN_TYPE_OPERATOR = '+',
     CATTO_TOKEN_TYPE_OPENING_BRACKET = '(',
-    CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')'
+    CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')',
+    CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET = '[',
+    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']'
 } catto_TokenType;
 
 typedef struct catto_Token {
@@ -27,6 +29,19 @@ typedef struct catto_Token {
     } value;
     struct catto_Token* nextToken;
 } catto_Token;
+
+typedef enum {
+    CATTO_DATA_TYPE_NUMBER = '%',
+    CATTO_DATA_TYPE_STRING = '$'
+} catto_DataType;
+
+typedef struct catto_TypedValue {
+    catto_DataType type;
+    union {
+        catto_Float asNumber;
+        catto_Char* asString;
+    } value;
+} catto_TypedValue;
 
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
@@ -47,6 +62,11 @@ typedef struct catto_AstNode {
             } attributes;
         } asStatement;
         struct {
+            catto_TypedValue* value;
+            catto_Char* subjectVariable;
+            struct catto_AstNode* index;
+        } asExpressionLeaf;
+        struct {
             struct catto_AstNode* child;
             catto_Char* operator;
         } asUnaryExpression;
@@ -62,6 +82,7 @@ catto_Context* catto_newContext();
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Char* catto_copyString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_stringToPositiveNumber(catto_Char* string, catto_Count* charactersEaten);
 
