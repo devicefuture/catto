@@ -105,6 +105,8 @@ catto_Context* catto_newContext();
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 
+catto_Float catto_power(catto_Float base, catto_Int power);
+catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
 catto_Count catto_stringLength(catto_Char* string);
