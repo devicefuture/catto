@@ -310,12 +310,14 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+    catto_AstNode* lastAstNode = *currentAstNodePtr;
 
     if (commandToken) {
         catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
 
         astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
         astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
+        astNode->value.asStatement.previousAstNode = lastAstNode;
 
         catto_AstNode* firstArgument = CATTO_NULL;
         catto_AstNode* currentArgument = CATTO_NULL;
@@ -328,6 +330,13 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             if (ifToken && catto_stringsEqual(ifToken->value.asCommandHandler->name, "if")) {
                 catto_parseExpression(currentTokenPtr, &currentArgument);
             }
+        }
+
+        if (
+            catto_stringsEqual(commandToken->value.asCommandHandler->name, "while") ||
+            catto_stringsEqual(commandToken->value.asCommandHandler->name, "until")
+        ) {
+            firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
 
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
@@ -374,9 +383,10 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
 
         astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.firstArgument = value;
         astNode->value.asStatement.attributes.asAssignee.subjectVariable = subjectVariable;
         astNode->value.asStatement.attributes.asAssignee.index = index;
-        astNode->value.asStatement.firstArgument = value;
+        astNode->value.asStatement.previousAstNode = lastAstNode;
 
         return astNode;
     }
@@ -419,28 +429,113 @@ catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command) {
     return commandHandler && catto_stringsEqual(commandHandler->name, command);
 }
 
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
+catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode) {
+    if (astNode->type != CATTO_AST_NODE_TYPE_COMMAND_STATEMENT) {
+        return CATTO_FALSE;
+    }
+
+    catto_AstNode* conditionSwitch = astNode->value.asStatement.firstArgument;
+
+    if (conditionSwitch && conditionSwitch->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        catto_TypedValue* value = conditionSwitch->value.asExpressionLeaf.value;
+
+        if (value && value->type == CATTO_DATA_TYPE_NUMBER) {
+            return value;
+        }
+    }
+
+    return CATTO_NULL;
+}
+
+catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode) {
+    catto_TypedValue* value = catto_getMarkConditionSwitch(astNode);
+
+    return value ? !!value->value.asNumber : CATTO_FALSE;
+}
+
+catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabled) {
+    catto_TypedValue* value = catto_getMarkConditionSwitch(astNode);
+
+    if (!value) {
+        return CATTO_FALSE;
+    }
+
+    value->value.asNumber = (catto_Float)enabled;
+
+    return CATTO_TRUE;
+}
+
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode) {
+    return (
+        catto_isCommand(astNode, "if") ||
+        catto_isCommand(astNode, "for") ||
+        catto_isCommand(astNode, "repeat") ||
+        (catto_isCommand(astNode, "while") && !catto_markConditionSwitchIsEnabled(astNode)) ||
+        (catto_isCommand(astNode, "until") && !catto_markConditionSwitchIsEnabled(astNode))
+    );
+}
+
+catto_Bool catto_isClosingMark(catto_AstNode* astNode) {
+    return (
+        catto_isCommand(astNode, "end") ||
+        catto_isCommand(astNode, "next") ||
+        catto_isCommand(astNode, "loop") ||
+        (catto_isCommand(astNode, "while") && catto_markConditionSwitchIsEnabled(astNode)) ||
+        (catto_isCommand(astNode, "until") && catto_markConditionSwitchIsEnabled(astNode))
+    );
+}
+
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
     catto_Int depth = 0;
 
+    if (astNode) {
+        astNode = astNode->value.asStatement.previousAstNode;
+    }
+
     while (astNode) {
+        if (depth < 0) {
+            break;
+        }
+
         if (depth == 0 && catto_isCommand(astNode, mark)) {
             return astNode;
         }
 
-        if (
-            catto_isCommand(astNode, "if") ||
-            catto_isCommand(astNode, "for") ||
-            catto_isCommand(astNode, "repeat") ||
-            catto_isCommand(astNode, "while")
-        ) {
+        if (catto_isClosingMark(astNode)) {
             depth++;
         }
 
-        if (
-            catto_isCommand(astNode, "end") ||
-            catto_isCommand(astNode, "next") ||
-            catto_isCommand(astNode, "loop")
-        ) {
+        if (catto_isOpeningMark(astNode)) {
+            depth--;
+        }
+
+        astNode = astNode->value.asStatement.previousAstNode;
+    }
+
+    return CATTO_NULL;
+}
+
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
+    catto_Int depth = 0;
+
+    if (astNode) {
+        astNode = astNode->nextAstNode;
+    }
+
+    while (astNode) {
+        if (depth < 0) {
+            break;
+        }
+
+        if (depth == 0 && catto_isCommand(astNode, mark)) {
+            return astNode;
+        }
+
+        if (catto_isOpeningMark(astNode)) {
+            depth++;
+        }
+
+        if (catto_isClosingMark(astNode)) {
             depth--;
         }
 

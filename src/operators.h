@@ -9,11 +9,11 @@ catto_Char* catto_operators[] = {
 catto_Char** catto_operatorPrecedence[] = {
     (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
     (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
+    (catto_Char*[]) {";", CATTO_NULL},
     (catto_Char*[]) {"+", "-", CATTO_NULL},
     (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
     (catto_Char*[]) {"^", CATTO_NULL},
     (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
-    (catto_Char*[]) {";", CATTO_NULL},
     CATTO_NULL
 };
 

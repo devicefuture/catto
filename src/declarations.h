@@ -1,7 +1,8 @@
 typedef enum {
     CATTO_ERROR_STATE_NONE,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
-    CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK
+    CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
+    CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK
 } catto_ErrorState;
 
 typedef struct catto_Context {
@@ -10,6 +11,7 @@ typedef struct catto_Context {
     struct catto_Variable* firstVariable;
     struct catto_Variable* lastVariable;
     struct catto_AstNode* firstParsedStatement;
+    struct catto_AstNode* currentParsedStatement;
     struct catto_AstNode* nextParsedStatement;
     struct catto_AstNode* firstParsedArgument;
     struct catto_AstNode* nextParsedArgument;
@@ -97,6 +99,7 @@ typedef struct catto_AstNode {
                     struct catto_AstNode* index;
                 } asAssignee;
             } attributes;
+            struct catto_AstNode* previousAstNode;
         } asStatement;
         struct {
             catto_TypedValue* value;
@@ -172,6 +175,12 @@ catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode*
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
 catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command);
+catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode);
+catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode);
+catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabled);
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode);
+catto_Bool catto_isClosingMark(catto_AstNode* astNode);
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark);
 catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);

@@ -226,6 +226,7 @@ catto_Bool catto_step(catto_Context* context) {
 
     catto_AstNode* currentStatement = context->nextParsedStatement;
 
+    context->currentParsedStatement = currentStatement;
     context->nextParsedStatement = currentStatement->nextAstNode;
     context->firstParsedArgument = currentStatement->value.asStatement.firstArgument;
     context->nextParsedArgument = context->firstParsedArgument;
@@ -390,19 +391,11 @@ void catto_command_goto(catto_Context* context) {
 void catto_command_if(catto_Context* context) {
     catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
 
-    catto_AstNode* elseStatement = catto_findClosingMark(context->nextParsedStatement, "else");
-    catto_AstNode* endStatement = catto_findClosingMark(context->nextParsedStatement, "end");
+    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else");
+    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end");
 
     if (elseStatement) {
-        catto_AstNode* conditionSwitch = elseStatement->value.asStatement.firstArgument;
-
-        if (conditionSwitch && conditionSwitch->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-            catto_TypedValue* value = conditionSwitch->value.asExpressionLeaf.value;
-
-            if (value && value->type == CATTO_DATA_TYPE_NUMBER) {
-                value->value.asNumber = (catto_Float)isTrue;
-            }
-        }
+        catto_setMarkConditionSwitch(elseStatement, isTrue);
     }
 
     if (!endStatement) {
@@ -425,7 +418,7 @@ void catto_command_else(catto_Context* context) {
     catto_Bool shouldSkip = catto_asBool(catto_evalNextArg(context));
     catto_Bool isElseIf = catto_hasNextArg(context);
 
-    catto_AstNode* endStatement = catto_findClosingMark(context->nextParsedStatement, "end");
+    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end");
 
     if (!endStatement) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
@@ -443,7 +436,7 @@ void catto_command_else(catto_Context* context) {
 
     catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
 
-    catto_AstNode* elseStatement = catto_findClosingMark(context->nextParsedStatement, "else");
+    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else");
 
     if (elseStatement) {
         catto_AstNode* conditionSwitch = elseStatement->value.asStatement.firstArgument;
@@ -470,10 +463,102 @@ void catto_command_else(catto_Context* context) {
 
 void catto_command_end(catto_Context* context) {}
 
+void catto_command_repeat(catto_Context* context) {
+    catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while");
+    catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until");
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop");
+
+    if (whileStatement) {
+        catto_setMarkConditionSwitch(whileStatement, CATTO_TRUE);
+        return;
+    }
+    
+    if (untilStatement) {
+        catto_setMarkConditionSwitch(untilStatement, CATTO_TRUE);
+        return;
+    }
+
+    if (loopStatement) {
+        return;
+    }
+
+    context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+}
+
+void catto_command_whileOrUntil(catto_Context* context, catto_Bool isUntil) {
+    catto_Bool isClosing = catto_asBool(catto_evalNextArg(context));
+    catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
+
+    if (isUntil) {
+        isTrue = !isTrue;
+    }
+
+    if (isClosing) {
+        if (isTrue) {
+            catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat");
+
+            if (repeatStatement) {
+                context->nextParsedStatement = repeatStatement;
+            } else {
+                context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+            }
+        }
+
+        return;
+    }
+
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop");
+
+    if (!loopStatement) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+        return;
+    }
+
+    if (!isTrue) {
+        context->nextParsedStatement = loopStatement->nextAstNode;
+        return;
+    }
+}
+
+void catto_command_while(catto_Context* context) {
+    catto_command_whileOrUntil(context, CATTO_FALSE);
+}
+
+void catto_command_until(catto_Context* context) {
+    catto_command_whileOrUntil(context, CATTO_TRUE);
+}
+
+void catto_command_loop(catto_Context* context) {
+    catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat");
+    catto_AstNode* whileStatement = catto_findOpeningMark(context->currentParsedStatement, "while");
+    catto_AstNode* untilStatement = catto_findOpeningMark(context->currentParsedStatement, "until");
+
+    if (repeatStatement) {
+        context->nextParsedStatement = repeatStatement;
+        return;
+    }
+
+    if (whileStatement) {
+        context->nextParsedStatement = whileStatement;
+        return;
+    }
+
+    if (untilStatement) {
+        context->nextParsedStatement = untilStatement;
+        return;
+    }
+
+    context->errorState = CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK;
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
     catto_addCommand(context, "if", &catto_command_if);
     catto_addCommand(context, "else", &catto_command_else);
     catto_addCommand(context, "end", &catto_command_end);
+    catto_addCommand(context, "repeat", &catto_command_repeat);
+    catto_addCommand(context, "while", &catto_command_while);
+    catto_addCommand(context, "until", &catto_command_until);
+    catto_addCommand(context, "loop", &catto_command_loop);
 }
