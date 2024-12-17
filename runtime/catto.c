@@ -134,7 +134,6 @@ int main(int argc, char* argv[]) {
             }
 
             if (firstLine) {
-
                 while (currentLine) {
                     if (currentLine->lineNumber == line->lineNumber) {
                         free(currentLine->code);

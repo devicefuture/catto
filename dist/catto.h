@@ -603,7 +603,7 @@ catto_TypedValue catto_evalNextArg(catto_Context* context) {
     catto_AstNode* currentArgument = context->nextParsedArgument;
     catto_TypedValue returnValue = catto_evalExpression(context, currentArgument);
 
-    context->nextParsedArgument = currentArgument->nextAstNode;
+    context->nextParsedArgument = currentArgument ? currentArgument->nextAstNode : CATTO_NULL;
 
     return returnValue;
 }
@@ -704,6 +704,7 @@ void catto_load(catto_Context* context, catto_Char* code) {
 
     while (currentAstNode) {
         if (
+            currentAstNode->type == CATTO_AST_NODE_TYPE_SYNTAX_ERROR ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_COMMAND_STATEMENT ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT
         ) {
@@ -1521,7 +1522,7 @@ catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_To
     catto_Count charactersEaten = 0;
     catto_Float number = catto_unsignedStringToNumber(code + *indexPtr, &charactersEaten);
 
-    if (number == CATTO_NAN) {
+    if (number == CATTO_NAN || charactersEaten == 0) {
         return CATTO_NULL;
     }
 
@@ -2140,20 +2141,20 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             catto_parseExpression(currentTokenPtr, &index);
 
             if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
-                return CATTO_NULL;
+                goto syntaxError;
             }
         }
 
         catto_Token* assignmentOperatorToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
 
         if (!assignmentOperatorToken || !catto_stringsEqual(assignmentOperatorToken->value.asString, "=")) {
-            return CATTO_NULL;
+            goto syntaxError;
         }
 
         catto_AstNode* value = CATTO_NULL;
 
         if (!catto_parseExpression(currentTokenPtr, &value)) {
-            return CATTO_NULL;
+            goto syntaxError;
         }
 
         catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
@@ -2167,7 +2168,13 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         return astNode;
     }
 
-    return CATTO_NULL;
+    syntaxError:
+
+    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
+
+    astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+
+    return astNode;
 }
 
 catto_AstNode* catto_parse(catto_Token* firstToken) {
@@ -2182,7 +2189,9 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
                 catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_NEXT_LINE)
             ) {}
         } else {
-            catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, &currentAstNode);
+            catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, &currentAstNode);
+
+            astNode->value.asStatement.lineNumber = 0;
 
             break;
         }

@@ -104,7 +104,7 @@ catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_To
     catto_Count charactersEaten = 0;
     catto_Float number = catto_unsignedStringToNumber(code + *indexPtr, &charactersEaten);
 
-    if (number == CATTO_NAN) {
+    if (number == CATTO_NAN || charactersEaten == 0) {
         return CATTO_NULL;
     }
 

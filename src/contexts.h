@@ -214,7 +214,7 @@ catto_TypedValue catto_evalNextArg(catto_Context* context) {
     catto_AstNode* currentArgument = context->nextParsedArgument;
     catto_TypedValue returnValue = catto_evalExpression(context, currentArgument);
 
-    context->nextParsedArgument = currentArgument->nextAstNode;
+    context->nextParsedArgument = currentArgument ? currentArgument->nextAstNode : CATTO_NULL;
 
     return returnValue;
 }
@@ -315,6 +315,7 @@ void catto_load(catto_Context* context, catto_Char* code) {
 
     while (currentAstNode) {
         if (
+            currentAstNode->type == CATTO_AST_NODE_TYPE_SYNTAX_ERROR ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_COMMAND_STATEMENT ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT
         ) {
