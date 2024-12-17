@@ -38,6 +38,18 @@ catto_TypedValue catto_asTypedString(catto_Char* value) {
     };
 }
 
+catto_Bool catto_asBool(catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_NUMBER) {
+        return value.value.asNumber != 0;
+    }
+
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        return catto_stringLength(value.value.asString) > 0;
+    }
+
+    return CATTO_FALSE;
+}
+
 void catto_freeTypedValue(catto_TypedValue* valuePtr) {
     if (!valuePtr) {
         return;

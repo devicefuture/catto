@@ -33,6 +33,21 @@ catto_AstNode* catto_addAstNode(catto_AstNodeType type, catto_AstNode** currentA
     return astNode;
 }
 
+catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr) {
+    catto_TypedValue* valuePtr = CATTO_NEW(catto_TypedValue);
+
+    valuePtr->type = value.type;
+    valuePtr->value = value.value;
+
+    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXPRESSION_LEAF, currentAstNodePtr);
+
+    astNode->value.asExpressionLeaf.value = valuePtr;
+    astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
+    astNode->value.asExpressionLeaf.index = CATTO_NULL;
+
+    return astNode;
+}
+
 catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
     if (!*currentTokenPtr || !(
         (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_STRING ||
@@ -305,6 +320,10 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         catto_AstNode* firstArgument = CATTO_NULL;
         catto_AstNode* currentArgument = CATTO_NULL;
 
+        if (catto_stringsEqual(commandToken->value.asCommandHandler->name, "else")) {
+            firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
+        }
+
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
             if (!firstArgument) {
                 firstArgument = currentArgument;
@@ -382,6 +401,47 @@ catto_AstNode* catto_parse(catto_Token* firstToken) {
     }
 
     return firstAstNode;
+}
+
+catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command) {
+    if (astNode->type != CATTO_AST_NODE_TYPE_COMMAND_STATEMENT) {
+        return CATTO_FALSE;
+    }
+
+    catto_CommandHandler* commandHandler = astNode->value.asStatement.attributes.asCommandHandler;
+
+    return commandHandler && catto_stringsEqual(commandHandler->name, command);
+}
+
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
+    catto_Int depth = 0;
+
+    while (astNode) {
+        if (depth == 0 && catto_isCommand(astNode, mark)) {
+            return astNode;
+        }
+
+        if (
+            catto_isCommand(astNode, "if") ||
+            catto_isCommand(astNode, "for") ||
+            catto_isCommand(astNode, "repeat") ||
+            catto_isCommand(astNode, "while")
+        ) {
+            depth++;
+        }
+
+        if (
+            catto_isCommand(astNode, "end") ||
+            catto_isCommand(astNode, "next") ||
+            catto_isCommand(astNode, "loop")
+        ) {
+            depth--;
+        }
+
+        astNode = astNode->nextAstNode;
+    }
+
+    return CATTO_NULL;
 }
 
 void catto_freeAstNodes(catto_AstNode* firstAstNode) {

@@ -52,15 +52,23 @@ int main(int argc, char* argv[]) {
             char* code = assembleLines();
 
             catto_load(context, code);
+            catto_run(context);
 
-            if (context->errorState == CATTO_ERROR_STATE_UNEXPECTED_TOKEN) {
+            catto_Char* message = "Unknown error";
+
+            switch (context->errorState) {
+                case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
+                case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
+
+                default: break;
+            }
+
+            if (context->errorState != CATTO_ERROR_STATE_NONE) {
                 if (context->subjectLineNumber > 0) {
-                    printf("Unexpected token at line %d\n", context->subjectLineNumber);                    
+                    printf("%s at line %d\n", message, context->subjectLineNumber);
                 } else {
-                    printf("Unexpected token\n");
+                    printf("%s\n", message);
                 }
-            } else {
-                catto_run(context);
             }
 
             free(code);

@@ -343,8 +343,22 @@ void catto_load(catto_Context* context, catto_Char* code) {
 }
 
 void catto_run(catto_Context* context) {
-    while (catto_step(context)) {
+    while (CATTO_TRUE) {
+        catto_AstNode* statement = context->nextParsedStatement;
+
+        if (statement && statement->value.asStatement.lineNumber > 0) {
+            context->subjectLineNumber = statement->value.asStatement.lineNumber;
+        }
+
+        if (!catto_step(context)) {
+            break;
+        }
+
         catto_gc(context);
+
+        if (context->errorState != CATTO_ERROR_STATE_NONE) {
+            break;
+        }
     }
 }
 
@@ -373,7 +387,64 @@ void catto_command_goto(catto_Context* context) {
     catto_goto(context, lineNumber);
 }
 
+void catto_command_if(catto_Context* context) {
+    catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
+
+    catto_AstNode* elseStatement = catto_findClosingMark(context->nextParsedStatement, "else");
+    catto_AstNode* endStatement = catto_findClosingMark(context->nextParsedStatement, "end");
+
+    if (elseStatement) {
+        catto_AstNode* conditionSwitch = elseStatement->value.asStatement.firstArgument;
+
+        if (conditionSwitch && conditionSwitch->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+            catto_TypedValue* value = conditionSwitch->value.asExpressionLeaf.value;
+
+            if (value && value->type == CATTO_DATA_TYPE_NUMBER) {
+                value->value.asNumber = (catto_Float)isTrue;
+            }
+        }
+    }
+
+    if (!elseStatement && !endStatement) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+        return;
+    }
+
+    if (!isTrue) {
+        if (elseStatement) {
+            context->nextParsedStatement = elseStatement;
+            return;
+        }
+
+        if (endStatement) {
+            context->nextParsedStatement = endStatement;
+            return;
+        }
+    }
+}
+
+void catto_command_else(catto_Context* context) {
+    catto_Bool shouldSkip = catto_asBool(catto_evalNextArg(context));
+
+    catto_AstNode* endStatement = catto_findClosingMark(context->nextParsedStatement, "end");
+
+    if (!endStatement) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+        return;
+    }
+
+    if (shouldSkip) {
+        context->nextParsedStatement = endStatement;
+        return;
+    }
+}
+
+void catto_command_end(catto_Context* context) {}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
+    catto_addCommand(context, "if", &catto_command_if);
+    catto_addCommand(context, "else", &catto_command_else);
+    catto_addCommand(context, "end", &catto_command_end);
 }

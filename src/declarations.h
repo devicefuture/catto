@@ -1,6 +1,7 @@
 typedef enum {
     CATTO_ERROR_STATE_NONE,
-    CATTO_ERROR_STATE_UNEXPECTED_TOKEN
+    CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
+    CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK
 } catto_ErrorState;
 
 typedef struct catto_Context {
@@ -158,6 +159,7 @@ catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
+catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
@@ -166,7 +168,10 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
 
+catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
+catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command);
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
