@@ -1,6 +1,7 @@
 typedef enum {
     CATTO_ERROR_STATE_NONE,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
+    CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
@@ -21,6 +22,8 @@ typedef struct catto_Context {
     struct catto_AstNode* nextParsedStatement;
     struct catto_AstNode* firstParsedArgument;
     struct catto_AstNode* nextParsedArgument;
+    struct catto_AstNode** statementStack;
+    catto_Count statementStackCount;
     void** pointersToGc;
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
@@ -148,6 +151,8 @@ catto_AstNode* catto_getNextArg(catto_Context* context);
 catto_TypedValue catto_evalNextArg(catto_Context* context);
 catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
+void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
+catto_AstNode* catto_popFromStatementStack(catto_Context* context);
 void catto_load(catto_Context* context, catto_Char* code);
 void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);

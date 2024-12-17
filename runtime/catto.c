@@ -58,6 +58,7 @@ int main(int argc, char* argv[]) {
 
             switch (context->errorState) {
                 case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
+                case CATTO_ERROR_STATE_NO_RETURN: message = "Nothing to return to"; break;
                 case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
                 case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
                 case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;

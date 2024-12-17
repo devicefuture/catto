@@ -79,6 +79,7 @@ typedef CATTO_FLOAT catto_Float;
 typedef enum {
     CATTO_ERROR_STATE_NONE,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
+    CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
@@ -99,6 +100,8 @@ typedef struct catto_Context {
     struct catto_AstNode* nextParsedStatement;
     struct catto_AstNode* firstParsedArgument;
     struct catto_AstNode* nextParsedArgument;
+    struct catto_AstNode** statementStack;
+    catto_Count statementStackCount;
     void** pointersToGc;
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
@@ -226,6 +229,8 @@ catto_AstNode* catto_getNextArg(catto_Context* context);
 catto_TypedValue catto_evalNextArg(catto_Context* context);
 catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
+void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
+catto_AstNode* catto_popFromStatementStack(catto_Context* context);
 void catto_load(catto_Context* context, catto_Char* code);
 void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
@@ -406,6 +411,9 @@ catto_Context* catto_newContext() {
     context->nextParsedStatement = CATTO_NULL;
     context->firstParsedArgument = CATTO_NULL;
     context->nextParsedArgument = CATTO_NULL;
+
+    context->statementStack = CATTO_MALLOC(0);
+    context->statementStackCount = 0;
 
     context->pointersToGc = CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
@@ -677,6 +685,24 @@ void catto_goto(catto_Context* context, catto_Count lineNumber) {
     context->nextParsedStatement = currentStatement;
 }
 
+void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement) {
+    context->statementStack = CATTO_REALLOC(context->statementStack, context->statementStackCount + 1);
+
+    context->statementStack[context->statementStackCount++] = statement;
+}
+
+catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
+    if (context->statementStackCount == 0) {
+        return CATTO_NULL;
+    }
+
+    catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
+
+    context->statementStack = CATTO_REALLOC(context->statementStack, --context->statementStackCount);
+
+    return lastStatement;
+}
+
 void catto_load(catto_Context* context, catto_Char* code) {
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
@@ -739,6 +765,8 @@ void catto_load(catto_Context* context, catto_Char* code) {
     context->subjectLineNumber = 0;
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
+    context->statementStack = CATTO_REALLOC(context->statementStack, 0);
+    context->statementStackCount = 0;
 
     catto_freeTokens(firstToken);
 }
@@ -786,6 +814,29 @@ void catto_command_goto(catto_Context* context) {
     }
 
     catto_goto(context, lineNumber);
+}
+
+void catto_command_gosub(catto_Context* context) {
+    catto_Int lineNumber = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+
+    if (lineNumber < 0) {
+        lineNumber = 0;
+    }
+
+    catto_pushOntoStatementStack(context, context->nextParsedStatement);
+
+    catto_goto(context, lineNumber);
+}
+
+void catto_command_return(catto_Context* context) {
+    catto_AstNode* statement = catto_popFromStatementStack(context);
+
+    if (!statement) {
+        context->errorState = CATTO_ERROR_STATE_NO_RETURN;
+        return;
+    }
+
+    context->nextParsedStatement = statement;
 }
 
 void catto_command_if(catto_Context* context) {
@@ -1106,6 +1157,8 @@ void catto_command_continue(catto_Context* context) {
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
+    catto_addCommand(context, "gosub", &catto_command_gosub);
+    catto_addCommand(context, "return", &catto_command_return);
     catto_addCommand(context, "if", &catto_command_if);
     catto_addCommand(context, "else", &catto_command_else);
     catto_addCommand(context, "end", &catto_command_end);
