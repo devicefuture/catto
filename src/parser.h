@@ -322,6 +322,12 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
         if (catto_stringsEqual(commandToken->value.asCommandHandler->name, "else")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
+
+            catto_Token* ifToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+
+            if (ifToken && catto_stringsEqual(ifToken->value.asCommandHandler->name, "if")) {
+                catto_parseExpression(currentTokenPtr, &currentArgument);
+            }
         }
 
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {

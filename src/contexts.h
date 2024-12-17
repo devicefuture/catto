@@ -405,7 +405,7 @@ void catto_command_if(catto_Context* context) {
         }
     }
 
-    if (!elseStatement && !endStatement) {
+    if (!endStatement) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
         return;
     }
@@ -416,15 +416,14 @@ void catto_command_if(catto_Context* context) {
             return;
         }
 
-        if (endStatement) {
-            context->nextParsedStatement = endStatement;
-            return;
-        }
+        context->nextParsedStatement = endStatement;
+        return;
     }
 }
 
 void catto_command_else(catto_Context* context) {
     catto_Bool shouldSkip = catto_asBool(catto_evalNextArg(context));
+    catto_Bool isElseIf = catto_hasNextArg(context);
 
     catto_AstNode* endStatement = catto_findClosingMark(context->nextParsedStatement, "end");
 
@@ -434,6 +433,36 @@ void catto_command_else(catto_Context* context) {
     }
 
     if (shouldSkip) {
+        context->nextParsedStatement = endStatement;
+        return;
+    }
+
+    if (!isElseIf) {
+        return;
+    }
+
+    catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
+
+    catto_AstNode* elseStatement = catto_findClosingMark(context->nextParsedStatement, "else");
+
+    if (elseStatement) {
+        catto_AstNode* conditionSwitch = elseStatement->value.asStatement.firstArgument;
+
+        if (conditionSwitch && conditionSwitch->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+            catto_TypedValue* value = conditionSwitch->value.asExpressionLeaf.value;
+
+            if (value && value->type == CATTO_DATA_TYPE_NUMBER) {
+                value->value.asNumber = (catto_Float)isTrue;
+            }
+        }
+    }
+
+    if (!isTrue) {
+        if (elseStatement) {
+            context->nextParsedStatement = elseStatement;
+            return;
+        }
+
         context->nextParsedStatement = endStatement;
         return;
     }
