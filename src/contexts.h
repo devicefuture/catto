@@ -753,6 +753,10 @@ void catto_command_continue(catto_Context* context) {
     context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
 }
 
+void catto_command_stop(catto_Context* context) {
+    context->nextParsedStatement = CATTO_NULL;
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
@@ -769,4 +773,5 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "loop", &catto_command_loop);
     catto_addCommand(context, "break", &catto_command_break);
     catto_addCommand(context, "continue", &catto_command_continue);
+    catto_addCommand(context, "stop", &catto_command_stop);
 }
