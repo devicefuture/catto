@@ -24,23 +24,23 @@ catto_Char* catto_unaryOperators[] = {
     CATTO_NULL
 };
 
-#define CATTO_UNARY_NUMERIC_OPERATOR(name, operator) catto_TypedValue name(catto_TypedValue value) { \
+#define CATTO_UNARY_NUMERIC_OPERATOR(name, operator) catto_TypedValue name(catto_Context* context, catto_TypedValue value) { \
         return catto_asTypedNumber(operator catto_asNumber(value)); \
     }
 
-#define CATTO_UNARY_INTEGER_OPERATOR(name, operator) catto_TypedValue name(catto_TypedValue value) { \
+#define CATTO_UNARY_INTEGER_OPERATOR(name, operator) catto_TypedValue name(catto_Context* context, catto_TypedValue value) { \
         return catto_asTypedNumber(operator (catto_Int)catto_asNumber(value)); \
     }
 
-#define CATTO_BINARY_NUMERIC_OPERATOR(name, operator) catto_TypedValue name(catto_TypedValue a, catto_TypedValue b) { \
+#define CATTO_BINARY_NUMERIC_OPERATOR(name, operator) catto_TypedValue name(catto_Context* context, catto_TypedValue a, catto_TypedValue b) { \
         return catto_asTypedNumber(catto_asNumber(a) operator catto_asNumber(b)); \
     }
 
-#define CATTO_BINARY_INTEGER_OPERATOR(name, operator) catto_TypedValue name(catto_TypedValue a, catto_TypedValue b) { \
+#define CATTO_BINARY_INTEGER_OPERATOR(name, operator) catto_TypedValue name(catto_Context* context, catto_TypedValue a, catto_TypedValue b) { \
         return catto_asTypedNumber((catto_Int)catto_asNumber(a) operator (catto_Int)catto_asNumber(b)); \
     }
 
-#define CATTO_BINARY_LOGICAL_OPERATOR(name, operator) catto_TypedValue name(catto_TypedValue a, catto_TypedValue b) { \
+#define CATTO_BINARY_LOGICAL_OPERATOR(name, operator) catto_TypedValue name(catto_Context* context, catto_TypedValue a, catto_TypedValue b) { \
         return catto_asTypedNumber(((catto_Int)catto_asNumber(a) operator (catto_Int)catto_asNumber(b)) ? 1 : 0); \
     }
 
@@ -66,12 +66,31 @@ CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_greaterThan, >);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_and, &&);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_or, ||);
 
-catto_TypedValue catto_binary_power(catto_TypedValue a, catto_TypedValue b) {
+catto_TypedValue catto_binary_power(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     return catto_asTypedNumber(catto_power(catto_asNumber(a), (catto_Int)catto_asNumber(b)));
 }
 
-catto_TypedValue catto_binary_xor(catto_TypedValue a, catto_TypedValue b) {
+catto_TypedValue catto_binary_xor(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     return catto_asTypedNumber(((catto_Int)catto_asNumber(a) ^ (catto_Int)catto_asNumber(b)) ? 1 : 0);
+}
+
+catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+    catto_Char* resultString = catto_copyString("");
+    catto_Char* aString = catto_asString(a);
+    catto_Char* bString = catto_asString(b);
+
+    resultString = catto_appendToString(resultString, aString);
+    resultString = catto_appendToString(resultString, bString);
+
+    CATTO_FREE(aString);
+    CATTO_FREE(bString);
+
+    catto_addPointerToGc(context, resultString);
+
+    return (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_STRING,
+        .value.asString = resultString
+    };
 }
 
 catto_OperatorMapping catto_operatorMappings[] = {
@@ -95,5 +114,6 @@ catto_OperatorMapping catto_operatorMappings[] = {
     {"or", CATTO_NULL, catto_binary_or},
     {"xor", CATTO_NULL, catto_binary_xor},
     {"not", catto_unary_not, CATTO_NULL},
+    {";", CATTO_NULL, catto_binary_concat},
     {CATTO_NULL, CATTO_NULL, CATTO_NULL}
 };

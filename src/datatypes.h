@@ -49,3 +49,15 @@ void catto_freeTypedValue(catto_TypedValue* valuePtr) {
 
     CATTO_FREE(valuePtr);
 }
+
+void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        catto_addPointerToGc(context, value.value.asString);
+    }
+}
+
+void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        catto_removePointerFromGc(context, value.value.asString);
+    }
+}

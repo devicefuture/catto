@@ -7,6 +7,8 @@ typedef struct catto_Context {
     struct catto_AstNode* nextParsedStatement;
     struct catto_AstNode* firstParsedArgument;
     struct catto_AstNode* nextParsedArgument;
+    void** pointersToGc;
+    catto_Count pointersToGcCount;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
@@ -92,6 +94,7 @@ typedef struct catto_AstNode {
             catto_TypedValue* value;
             catto_Char* subjectVariable;
             struct catto_AstNode* index;
+            catto_Bool appendFlag;
         } asExpressionLeaf;
         struct {
             struct catto_AstNode* child;
@@ -105,8 +108,8 @@ typedef struct catto_AstNode {
     struct catto_AstNode* nextAstNode;
 } catto_AstNode;
 
-typedef catto_TypedValue (*catto_UnaryOperatorFunction)(catto_TypedValue value);
-typedef catto_TypedValue (*catto_BinaryOperatorFunction)(catto_TypedValue a, catto_TypedValue b);
+typedef catto_TypedValue (*catto_UnaryOperatorFunction)(catto_Context* context, catto_TypedValue value);
+typedef catto_TypedValue (*catto_BinaryOperatorFunction)(catto_Context* context, catto_TypedValue a, catto_TypedValue b);
 
 typedef struct catto_OperatorMapping {
     catto_Char* operator;
@@ -115,6 +118,9 @@ typedef struct catto_OperatorMapping {
 } catto_OperatorMapping;
 
 catto_Context* catto_newContext();
+void catto_addPointerToGc(catto_Context* context, void* ptr);
+void catto_removePointerFromGc(catto_Context* context, void* ptr);
+void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
@@ -146,6 +152,8 @@ catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
+void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
+void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
 catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);

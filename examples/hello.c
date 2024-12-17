@@ -59,8 +59,11 @@ int main(int argc, char* argv[]) {
             catto_load(
                 context,
                 "10 print \"Hello, world!\"\n"
-                "20 x=x+1\n"
+                "20 x=x+1"
                 "30 print \"x is:\", x\n"
+                "40 print \"concat \"; x\n"
+                "50 y=x; \" concat\"\n"
+                "60 print y"
             );
 
             catto_run(context);

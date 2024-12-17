@@ -94,6 +94,23 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
     astNode->value.asExpressionLeaf.index = index;
 
+    catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
+
+    if (
+        *currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR && catto_stringsEqual((*currentTokenPtr)->value.asString, ";") &&
+        (
+            !tokenPtrAfter || (tokenPtrAfter && (
+                tokenPtrAfter->type == CATTO_TOKEN_TYPE_NEXT_LINE ||
+                tokenPtrAfter->type == CATTO_TOKEN_TYPE_DELIMETER ||
+                tokenPtrAfter->type == CATTO_TOKEN_TYPE_STATEMENT_DELIMETER
+            ))
+        )
+    ) {
+        astNode->value.asExpressionLeaf.appendFlag = CATTO_TRUE;
+
+        catto_eat(currentTokenPtr);
+    }
+
     return astNode;
 }
 

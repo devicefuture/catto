@@ -124,6 +124,8 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     catto_Char* currentString = CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
 
+    currentString[currentStringIndex] = '\0';
+
     if (stringOpener != '"' && stringOpener != '\'' && stringOpener != '`') {
         CATTO_FREE(currentString);
 

@@ -11,7 +11,46 @@ catto_Context* catto_newContext() {
     context->firstParsedArgument = CATTO_NULL;
     context->nextParsedArgument = CATTO_NULL;
 
+    context->pointersToGc = CATTO_MALLOC(0);
+    context->pointersToGcCount = 0;
+
     return context;
+}
+
+void catto_addPointerToGc(catto_Context* context, void* ptr) {
+    catto_removePointerFromGc(context, ptr);
+
+    context->pointersToGc = CATTO_REALLOC(context->pointersToGc, sizeof(void*) * context->pointersToGcCount + 1);
+    context->pointersToGc[context->pointersToGcCount++] = ptr;
+}
+
+void catto_removePointerFromGc(catto_Context* context, void* ptr) {
+    if (!ptr || context->pointersToGcCount == 0) {
+        return;
+    }
+
+    for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
+        if (context->pointersToGc[i] == ptr) {
+            context->pointersToGc[i] = CATTO_NULL;
+        }
+    }
+}
+
+void catto_gc(catto_Context* context) {
+    if (context->pointersToGcCount == 0) {
+        return;
+    }
+
+    for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
+        void* ptr = context->pointersToGc[i];
+
+        if (ptr) {
+            CATTO_FREE(ptr);
+        }
+    }
+
+    context->pointersToGc = CATTO_REALLOC(context->pointersToGc, 0);
+    context->pointersToGcCount = 0;
 }
 
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function) {
@@ -49,7 +88,11 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value) {
     catto_TypedValue* existingVariableValue = catto_getVariable(context, name);
 
+    catto_removeTypedValueFromGc(context, value);
+
     if (existingVariableValue) {
+        catto_addTypedValueToGc(context, *existingVariableValue);
+
         *existingVariableValue = value;
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
@@ -111,7 +154,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
                 catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
 
                 if (function) {
-                    return function(catto_evalExpression(context, astNode->value.asUnaryExpression.child));
+                    return function(context, catto_evalExpression(context, astNode->value.asUnaryExpression.child));
                 }
 
                 return DEFAULT_RETURN_VALUE;
@@ -140,7 +183,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
                     catto_BinaryOperatorFunction function = currentOperatorMapping.binaryFunction;
 
                     if (function) {
-                        currentValue = function(currentValue, catto_evalExpression(context, currentChild));
+                        currentValue = function(context, currentValue, catto_evalExpression(context, currentChild));
                         foundOperatorMapping = CATTO_TRUE;
                         break;
                     }
@@ -246,7 +289,9 @@ void catto_load(catto_Context* context, catto_Char* code) {
 }
 
 void catto_run(catto_Context* context) {
-    while (catto_step(context)) {}
+    while (catto_step(context)) {
+        catto_gc(context);
+    }
 }
 
 void catto_command_print(catto_Context* context) {
