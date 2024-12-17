@@ -60,6 +60,7 @@ int main(int argc, char* argv[]) {
                 case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
                 case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
                 case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
+                case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;
 
                 default: break;
             }

@@ -514,9 +514,9 @@ catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabl
     return CATTO_TRUE;
 }
 
-catto_Bool catto_isOpeningMark(catto_AstNode* astNode) {
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode) {
     return (
-        catto_isCommand(astNode, "if") ||
+        (searchMode != CATTO_MARK_SEARCH_LOOP_ONLY && catto_isCommand(astNode, "if")) ||
         catto_isCommand(astNode, "for") ||
         catto_isCommand(astNode, "repeat") ||
         (catto_isCommand(astNode, "while") && !catto_markConditionSwitchIsEnabled(astNode)) ||
@@ -524,9 +524,9 @@ catto_Bool catto_isOpeningMark(catto_AstNode* astNode) {
     );
 }
 
-catto_Bool catto_isClosingMark(catto_AstNode* astNode) {
+catto_Bool catto_isClosingMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode) {
     return (
-        catto_isCommand(astNode, "end") ||
+        (searchMode != CATTO_MARK_SEARCH_LOOP_ONLY && catto_isCommand(astNode, "end")) ||
         catto_isCommand(astNode, "next") ||
         catto_isCommand(astNode, "loop") ||
         (catto_isCommand(astNode, "while") && catto_markConditionSwitchIsEnabled(astNode)) ||
@@ -534,7 +534,7 @@ catto_Bool catto_isClosingMark(catto_AstNode* astNode) {
     );
 }
 
-catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode) {
     catto_Int depth = 0;
 
     if (astNode) {
@@ -546,15 +546,18 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
             break;
         }
 
-        if (depth == 0 && catto_isCommand(astNode, mark)) {
+        if (depth == 0 && (
+            (mark && catto_isCommand(astNode, mark)) ||
+            (!mark && catto_isOpeningMark(astNode, searchMode))
+        )) {
             return astNode;
         }
 
-        if (catto_isClosingMark(astNode)) {
+        if (catto_isClosingMark(astNode, searchMode)) {
             depth++;
         }
 
-        if (catto_isOpeningMark(astNode)) {
+        if (catto_isOpeningMark(astNode, searchMode)) {
             depth--;
         }
 
@@ -564,7 +567,7 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
     return CATTO_NULL;
 }
 
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode) {
     catto_Int depth = 0;
 
     if (astNode) {
@@ -576,15 +579,18 @@ catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
             break;
         }
 
-        if (depth == 0 && catto_isCommand(astNode, mark)) {
+        if (depth == 0 && (
+            (mark && catto_isCommand(astNode, mark)) ||
+            (!mark && catto_isClosingMark(astNode, searchMode))
+        )) {
             return astNode;
         }
 
-        if (catto_isOpeningMark(astNode)) {
+        if (catto_isOpeningMark(astNode, searchMode)) {
             depth++;
         }
 
-        if (catto_isClosingMark(astNode)) {
+        if (catto_isClosingMark(astNode, searchMode)) {
             depth--;
         }
 

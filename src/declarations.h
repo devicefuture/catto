@@ -2,8 +2,14 @@ typedef enum {
     CATTO_ERROR_STATE_NONE,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
-    CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK
+    CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
+    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
 } catto_ErrorState;
+
+typedef enum {
+    CATTO_MARK_SEARCH_ALL,
+    CATTO_MARK_SEARCH_LOOP_ONLY
+} catto_MarkSearchMode;
 
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
@@ -179,9 +185,9 @@ catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command);
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode);
 catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode);
 catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabled);
-catto_Bool catto_isOpeningMark(catto_AstNode* astNode);
-catto_Bool catto_isClosingMark(catto_AstNode* astNode);
-catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark);
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark);
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
+catto_Bool catto_isClosingMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);

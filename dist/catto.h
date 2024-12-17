@@ -80,8 +80,14 @@ typedef enum {
     CATTO_ERROR_STATE_NONE,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
-    CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK
+    CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
+    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
 } catto_ErrorState;
+
+typedef enum {
+    CATTO_MARK_SEARCH_ALL,
+    CATTO_MARK_SEARCH_LOOP_ONLY
+} catto_MarkSearchMode;
 
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
@@ -257,10 +263,10 @@ catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command);
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode);
 catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode);
 catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabled);
-catto_Bool catto_isOpeningMark(catto_AstNode* astNode);
-catto_Bool catto_isClosingMark(catto_AstNode* astNode);
-catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark);
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark);
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
+catto_Bool catto_isClosingMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
 
@@ -785,8 +791,8 @@ void catto_command_goto(catto_Context* context) {
 void catto_command_if(catto_Context* context) {
     catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
 
-    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else");
-    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end");
+    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else", CATTO_MARK_SEARCH_ALL);
+    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end", CATTO_MARK_SEARCH_ALL);
 
     if (elseStatement) {
         catto_setMarkConditionSwitch(elseStatement, isTrue);
@@ -812,7 +818,7 @@ void catto_command_else(catto_Context* context) {
     catto_Bool shouldSkip = catto_asBool(catto_evalNextArg(context));
     catto_Bool isElseIf = catto_hasNextArg(context);
 
-    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end");
+    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end", CATTO_MARK_SEARCH_ALL);
 
     if (!endStatement) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
@@ -830,7 +836,7 @@ void catto_command_else(catto_Context* context) {
 
     catto_Bool isTrue = catto_asBool(catto_evalNextArg(context));
 
-    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else");
+    catto_AstNode* elseStatement = catto_findClosingMark(context->currentParsedStatement, "else", CATTO_MARK_SEARCH_ALL);
 
     if (elseStatement) {
         catto_AstNode* conditionSwitch = elseStatement->value.asStatement.firstArgument;
@@ -858,7 +864,7 @@ void catto_command_else(catto_Context* context) {
 void catto_command_end(catto_Context* context) {}
 
 void catto_command_for(catto_Context* context) {
-    if (!catto_findClosingMark(context->currentParsedStatement, "next")) {
+    if (!catto_findClosingMark(context->currentParsedStatement, "next", CATTO_MARK_SEARCH_ALL)) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
         return;
     }
@@ -875,7 +881,7 @@ void catto_command_for(catto_Context* context) {
 }
 
 void catto_command_next(catto_Context* context) {
-    catto_AstNode* forStatement = catto_findOpeningMark(context->currentParsedStatement, "for");
+    catto_AstNode* forStatement = catto_findOpeningMark(context->currentParsedStatement, "for", CATTO_MARK_SEARCH_ALL);
 
     if (!forStatement) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK;
@@ -914,9 +920,9 @@ void catto_command_next(catto_Context* context) {
 }
 
 void catto_command_repeat(catto_Context* context) {
-    catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while");
-    catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until");
-    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop");
+    catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while", CATTO_MARK_SEARCH_ALL);
+    catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until", CATTO_MARK_SEARCH_ALL);
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_ALL);
 
     if (whileStatement) {
         catto_setMarkConditionSwitch(whileStatement, CATTO_TRUE);
@@ -945,7 +951,7 @@ void catto_command_whileOrUntil(catto_Context* context, catto_Bool isUntil) {
 
     if (isClosing) {
         if (isTrue) {
-            catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat");
+            catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat", CATTO_MARK_SEARCH_ALL);
 
             if (repeatStatement) {
                 context->nextParsedStatement = repeatStatement;
@@ -957,7 +963,7 @@ void catto_command_whileOrUntil(catto_Context* context, catto_Bool isUntil) {
         return;
     }
 
-    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop");
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_ALL);
 
     if (!loopStatement) {
         context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
@@ -979,9 +985,9 @@ void catto_command_until(catto_Context* context) {
 }
 
 void catto_command_loop(catto_Context* context) {
-    catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat");
-    catto_AstNode* whileStatement = catto_findOpeningMark(context->currentParsedStatement, "while");
-    catto_AstNode* untilStatement = catto_findOpeningMark(context->currentParsedStatement, "until");
+    catto_AstNode* repeatStatement = catto_findOpeningMark(context->currentParsedStatement, "repeat", CATTO_MARK_SEARCH_ALL);
+    catto_AstNode* whileStatement = catto_findOpeningMark(context->currentParsedStatement, "while", CATTO_MARK_SEARCH_ALL);
+    catto_AstNode* untilStatement = catto_findOpeningMark(context->currentParsedStatement, "until", CATTO_MARK_SEARCH_ALL);
 
     if (repeatStatement) {
         context->nextParsedStatement = repeatStatement;
@@ -1001,6 +1007,102 @@ void catto_command_loop(catto_Context* context) {
     context->errorState = CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK;
 }
 
+void catto_command_break(catto_Context* context) {
+    catto_AstNode* openingStatement = catto_findOpeningMark(context->currentParsedStatement, CATTO_NULL, CATTO_MARK_SEARCH_LOOP_ONLY);
+
+    if (!openingStatement) {
+        context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+        return;
+    }
+
+    if (catto_isCommand(openingStatement, "repeat")) {
+        catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while", CATTO_MARK_SEARCH_LOOP_ONLY);
+        catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until", CATTO_MARK_SEARCH_LOOP_ONLY);
+        catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_LOOP_ONLY);
+
+        if (whileStatement) {
+            context->nextParsedStatement = whileStatement->nextAstNode;
+            return;
+        }
+
+        if (untilStatement) {
+            context->nextParsedStatement = untilStatement->nextAstNode;
+            return;
+        }
+
+        if (loopStatement) {
+            context->nextParsedStatement = loopStatement->nextAstNode;
+            return;
+        }
+
+        context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+        return;
+    }
+
+    catto_AstNode* nextStatement = catto_findClosingMark(context->currentParsedStatement, "next", CATTO_MARK_SEARCH_LOOP_ONLY);
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_LOOP_ONLY);
+
+    if (nextStatement) {
+        context->nextParsedStatement = nextStatement->nextAstNode;
+        return;
+    }
+
+    if (loopStatement) {
+        context->nextParsedStatement = loopStatement->nextAstNode;
+        return;
+    }
+
+    context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+}
+
+void catto_command_continue(catto_Context* context) {
+    catto_AstNode* openingStatement = catto_findOpeningMark(context->currentParsedStatement, CATTO_NULL, CATTO_MARK_SEARCH_LOOP_ONLY);
+
+    if (!openingStatement) {
+        context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+        return;
+    }
+
+    if (catto_isCommand(openingStatement, "repeat")) {
+        catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while", CATTO_MARK_SEARCH_LOOP_ONLY);
+        catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until", CATTO_MARK_SEARCH_LOOP_ONLY);
+        catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_LOOP_ONLY);
+
+        if (whileStatement) {
+            context->nextParsedStatement = whileStatement;
+            return;
+        }
+
+        if (untilStatement) {
+            context->nextParsedStatement = untilStatement;
+            return;
+        }
+
+        if (loopStatement) {
+            context->nextParsedStatement = loopStatement;
+            return;
+        }
+
+        context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+        return;
+    }
+
+    catto_AstNode* nextStatement = catto_findClosingMark(context->currentParsedStatement, "next", CATTO_MARK_SEARCH_LOOP_ONLY);
+    catto_AstNode* loopStatement = catto_findClosingMark(context->currentParsedStatement, "loop", CATTO_MARK_SEARCH_LOOP_ONLY);
+
+    if (nextStatement) {
+        context->nextParsedStatement = nextStatement;
+        return;
+    }
+
+    if (loopStatement) {
+        context->nextParsedStatement = loopStatement;
+        return;
+    }
+
+    context->errorState = CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP;
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
@@ -1013,6 +1115,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "while", &catto_command_while);
     catto_addCommand(context, "until", &catto_command_until);
     catto_addCommand(context, "loop", &catto_command_loop);
+    catto_addCommand(context, "break", &catto_command_break);
+    catto_addCommand(context, "continue", &catto_command_continue);
 }
 
 // src/numbers.h
@@ -2353,9 +2457,9 @@ catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabl
     return CATTO_TRUE;
 }
 
-catto_Bool catto_isOpeningMark(catto_AstNode* astNode) {
+catto_Bool catto_isOpeningMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode) {
     return (
-        catto_isCommand(astNode, "if") ||
+        (searchMode != CATTO_MARK_SEARCH_LOOP_ONLY && catto_isCommand(astNode, "if")) ||
         catto_isCommand(astNode, "for") ||
         catto_isCommand(astNode, "repeat") ||
         (catto_isCommand(astNode, "while") && !catto_markConditionSwitchIsEnabled(astNode)) ||
@@ -2363,9 +2467,9 @@ catto_Bool catto_isOpeningMark(catto_AstNode* astNode) {
     );
 }
 
-catto_Bool catto_isClosingMark(catto_AstNode* astNode) {
+catto_Bool catto_isClosingMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode) {
     return (
-        catto_isCommand(astNode, "end") ||
+        (searchMode != CATTO_MARK_SEARCH_LOOP_ONLY && catto_isCommand(astNode, "end")) ||
         catto_isCommand(astNode, "next") ||
         catto_isCommand(astNode, "loop") ||
         (catto_isCommand(astNode, "while") && catto_markConditionSwitchIsEnabled(astNode)) ||
@@ -2373,7 +2477,7 @@ catto_Bool catto_isClosingMark(catto_AstNode* astNode) {
     );
 }
 
-catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode) {
     catto_Int depth = 0;
 
     if (astNode) {
@@ -2385,15 +2489,18 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
             break;
         }
 
-        if (depth == 0 && catto_isCommand(astNode, mark)) {
+        if (depth == 0 && (
+            (mark && catto_isCommand(astNode, mark)) ||
+            (!mark && catto_isOpeningMark(astNode, searchMode))
+        )) {
             return astNode;
         }
 
-        if (catto_isClosingMark(astNode)) {
+        if (catto_isClosingMark(astNode, searchMode)) {
             depth++;
         }
 
-        if (catto_isOpeningMark(astNode)) {
+        if (catto_isOpeningMark(astNode, searchMode)) {
             depth--;
         }
 
@@ -2403,7 +2510,7 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark) {
     return CATTO_NULL;
 }
 
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode) {
     catto_Int depth = 0;
 
     if (astNode) {
@@ -2415,15 +2522,18 @@ catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark) {
             break;
         }
 
-        if (depth == 0 && catto_isCommand(astNode, mark)) {
+        if (depth == 0 && (
+            (mark && catto_isCommand(astNode, mark)) ||
+            (!mark && catto_isClosingMark(astNode, searchMode))
+        )) {
             return astNode;
         }
 
-        if (catto_isOpeningMark(astNode)) {
+        if (catto_isOpeningMark(astNode, searchMode)) {
             depth++;
         }
 
-        if (catto_isClosingMark(astNode)) {
+        if (catto_isClosingMark(astNode, searchMode)) {
             depth--;
         }
 
