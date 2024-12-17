@@ -52,7 +52,16 @@ int main(int argc, char* argv[]) {
             char* code = assembleLines();
 
             catto_load(context, code);
-            catto_run(context);
+
+            if (context->errorState == CATTO_ERROR_STATE_UNEXPECTED_TOKEN) {
+                if (context->subjectLineNumber > 0) {
+                    printf("Unexpected token at line %d\n", context->subjectLineNumber);                    
+                } else {
+                    printf("Unexpected token\n");
+                }
+            } else {
+                catto_run(context);
+            }
 
             free(code);
 

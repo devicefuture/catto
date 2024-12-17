@@ -1,3 +1,8 @@
+typedef enum {
+    CATTO_ERROR_STATE_NONE,
+    CATTO_ERROR_STATE_UNEXPECTED_TOKEN
+} catto_ErrorState;
+
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
@@ -9,6 +14,8 @@ typedef struct catto_Context {
     struct catto_AstNode* nextParsedArgument;
     void** pointersToGc;
     catto_Count pointersToGcCount;
+    catto_ErrorState errorState;
+    catto_Count subjectLineNumber;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);

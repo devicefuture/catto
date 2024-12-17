@@ -76,6 +76,11 @@ typedef CATTO_FLOAT catto_Float;
 
 // src/declarations.h
 
+typedef enum {
+    CATTO_ERROR_STATE_NONE,
+    CATTO_ERROR_STATE_UNEXPECTED_TOKEN
+} catto_ErrorState;
+
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
@@ -87,6 +92,8 @@ typedef struct catto_Context {
     struct catto_AstNode* nextParsedArgument;
     void** pointersToGc;
     catto_Count pointersToGcCount;
+    catto_ErrorState errorState;
+    catto_Count subjectLineNumber;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
@@ -382,6 +389,9 @@ catto_Context* catto_newContext() {
     context->pointersToGc = CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
 
+    context->errorState = CATTO_ERROR_STATE_NONE;
+    context->subjectLineNumber = 0;
+
     return context;
 }
 
@@ -643,13 +653,64 @@ void catto_goto(catto_Context* context, catto_Count lineNumber) {
 }
 
 void catto_load(catto_Context* context, catto_Char* code) {
+    context->errorState = CATTO_ERROR_STATE_NONE;
+    context->subjectLineNumber = 0;
+
     catto_Token* firstToken = catto_tokenise(context, code);
+    catto_Token* currentToken = firstToken;
+
+    while (currentToken) {
+        if (currentToken->type == CATTO_TOKEN_TYPE_LINE_NUMBER) {
+            context->subjectLineNumber = currentToken->value.asLineNumber;
+        }
+
+        if (currentToken->type == CATTO_TOKEN_TYPE_SYNTAX_ERROR) {
+            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+
+            catto_freeTokens(firstToken);
+
+            return;
+        }
+
+        currentToken = currentToken->nextToken;
+    }
+
     catto_AstNode* firstAstNode = catto_parse(firstToken);
+    catto_AstNode* currentAstNode = firstAstNode;
 
     if (context->firstParsedStatement) {
         catto_freeAstNodes(context->firstParsedStatement);
+
+        context->firstParsedStatement = CATTO_NULL;
+        context->nextParsedStatement = CATTO_NULL;
     }
 
+    context->subjectLineNumber = 0;
+
+    while (currentAstNode) {
+        if (
+            currentAstNode->type == CATTO_AST_NODE_TYPE_COMMAND_STATEMENT ||
+            currentAstNode->type == CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT
+        ) {
+            catto_Count lineNumber = currentAstNode->value.asStatement.lineNumber;
+
+            if (lineNumber > 0) {
+                context->subjectLineNumber = lineNumber;
+            }
+        }
+
+        if (currentAstNode->type == CATTO_AST_NODE_TYPE_SYNTAX_ERROR) {
+            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+
+            catto_freeTokens(firstToken);
+
+            return;
+        }
+
+        currentAstNode = currentAstNode->nextAstNode;
+    }
+
+    context->subjectLineNumber = 0;
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
 
