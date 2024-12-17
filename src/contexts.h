@@ -210,13 +210,16 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
     return DEFAULT_RETURN_VALUE;
 }
 
-catto_TypedValue catto_evalNextArg(catto_Context* context) {
+catto_AstNode* catto_getNextArg(catto_Context* context) {
     catto_AstNode* currentArgument = context->nextParsedArgument;
-    catto_TypedValue returnValue = catto_evalExpression(context, currentArgument);
 
     context->nextParsedArgument = currentArgument ? currentArgument->nextAstNode : CATTO_NULL;
 
-    return returnValue;
+    return currentArgument;
+}
+
+catto_TypedValue catto_evalNextArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getNextArg(context));
 }
 
 catto_Bool catto_step(catto_Context* context) {
@@ -464,6 +467,62 @@ void catto_command_else(catto_Context* context) {
 
 void catto_command_end(catto_Context* context) {}
 
+void catto_command_for(catto_Context* context) {
+    if (!catto_findClosingMark(context->currentParsedStatement, "next")) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+        return;
+    }
+
+    catto_AstNode* identifier = catto_getNextArg(context);
+    catto_TypedValue start = catto_evalNextArg(context);
+
+    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, start);
+}
+
+void catto_command_next(catto_Context* context) {
+    catto_AstNode* forStatement = catto_findOpeningMark(context->currentParsedStatement, "for");
+
+    if (!forStatement) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK;
+        return;
+    }
+
+    context->nextParsedArgument = forStatement->value.asStatement.firstArgument;
+
+    catto_AstNode* identifier = catto_getNextArg(context);
+    catto_TypedValue start = catto_evalNextArg(context);
+    catto_TypedValue stop = catto_evalNextArg(context);
+
+    catto_TypedValue step = catto_hasNextArg(context) ? catto_evalNextArg(context) : (
+        catto_asNumber(stop) < catto_asNumber(start) ?
+        catto_asTypedNumber(-1) :
+        catto_asTypedNumber(1)
+    );
+
+    if (!identifier || identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    catto_Float currentValue = catto_asNumber(catto_evalExpression(context, identifier));
+
+    if (
+        (catto_asNumber(step) >= 0 && currentValue >= catto_asNumber(stop)) ||
+        (catto_asNumber(step) < 0 && currentValue <= catto_asNumber(stop))
+    ) {
+        return;
+    }
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, catto_asTypedNumber(currentValue + catto_asNumber(step)));
+
+    context->nextParsedStatement = forStatement->nextAstNode;
+}
+
 void catto_command_repeat(catto_Context* context) {
     catto_AstNode* whileStatement = catto_findClosingMark(context->currentParsedStatement, "while");
     catto_AstNode* untilStatement = catto_findClosingMark(context->currentParsedStatement, "until");
@@ -558,6 +617,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "if", &catto_command_if);
     catto_addCommand(context, "else", &catto_command_else);
     catto_addCommand(context, "end", &catto_command_end);
+    catto_addCommand(context, "for", &catto_command_for);
+    catto_addCommand(context, "next", &catto_command_next);
     catto_addCommand(context, "repeat", &catto_command_repeat);
     catto_addCommand(context, "while", &catto_command_while);
     catto_addCommand(context, "until", &catto_command_until);

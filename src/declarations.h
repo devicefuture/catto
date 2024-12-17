@@ -138,6 +138,7 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
+catto_AstNode* catto_getNextArg(catto_Context* context);
 catto_TypedValue catto_evalNextArg(catto_Context* context);
 catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);

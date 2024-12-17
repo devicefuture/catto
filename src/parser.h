@@ -15,7 +15,25 @@ catto_Token* catto_eatIfType(catto_Token** currentTokenPtr, catto_TokenType type
         return CATTO_NULL;
     }
 
-    catto_eat(currentTokenPtr);
+    return catto_eat(currentTokenPtr);
+}
+
+catto_Token* catto_eatIfKeyword(catto_Token** currentTokenPtr, catto_Char* keyword) {
+    if (!*currentTokenPtr) {
+        return CATTO_NULL;
+    }
+
+    if (
+        ((*currentTokenPtr)->type == CATTO_TOKEN_TYPE_COMMAND && catto_stringsEqual((*currentTokenPtr)->value.asCommandHandler->name, keyword)) ||
+        ((
+            (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_IDENTIFIER ||
+            (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR
+        ) && catto_stringsEqual((*currentTokenPtr)->value.asString, keyword))
+    ) {
+        return catto_eat(currentTokenPtr);
+    }
+
+    return CATTO_NULL;
 }
 
 catto_AstNode* catto_addAstNode(catto_AstNodeType type, catto_AstNode** currentAstNodePtr) {
@@ -319,25 +337,46 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
         astNode->value.asStatement.previousAstNode = lastAstNode;
 
+        catto_Char* commandName = commandToken->value.asCommandHandler->name;
+
         catto_AstNode* firstArgument = CATTO_NULL;
         catto_AstNode* currentArgument = CATTO_NULL;
 
-        if (catto_stringsEqual(commandToken->value.asCommandHandler->name, "else")) {
+        if (catto_stringsEqual(commandName, "else")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
 
-            catto_Token* ifToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+            if (!catto_eatIfKeyword(currentTokenPtr, "if")) {
+                goto finishAstNode;
+            }
 
-            if (ifToken && catto_stringsEqual(ifToken->value.asCommandHandler->name, "if")) {
+            catto_parseExpression(currentTokenPtr, &currentArgument);
+        }
+
+        if (catto_stringsEqual(commandName, "for")) {
+            firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
+
+            if (!catto_eatIfKeyword(currentTokenPtr, "=")) {
+                goto finishAstNode;
+            }
+
+            catto_parseExpression(currentTokenPtr, &currentArgument);
+
+            if (!catto_eatIfKeyword(currentTokenPtr, "to")) {
+                goto finishAstNode;
+            }
+
+            catto_parseExpression(currentTokenPtr, &currentArgument);
+
+            if (catto_eatIfKeyword(currentTokenPtr, "step")) {
                 catto_parseExpression(currentTokenPtr, &currentArgument);
             }
         }
 
-        if (
-            catto_stringsEqual(commandToken->value.asCommandHandler->name, "while") ||
-            catto_stringsEqual(commandToken->value.asCommandHandler->name, "until")
-        ) {
+        if (catto_stringsEqual(commandName, "while") || catto_stringsEqual(commandName, "until")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
+
+        finishAstNode:
 
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
             if (!firstArgument) {
@@ -396,6 +435,8 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+
+    catto_eat(currentTokenPtr);
 
     return astNode;
 }
