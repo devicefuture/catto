@@ -237,6 +237,12 @@ catto_Bool catto_step(catto_Context* context) {
     context->firstParsedArgument = currentStatement->value.asStatement.firstArgument;
     context->nextParsedArgument = context->firstParsedArgument;
 
+    if (currentStatement->value.asStatement.lineNumber > 0) {
+        context->subjectLineNumber = currentStatement->value.asStatement.lineNumber;
+    }
+
+    catto_gc(context);
+
     switch (currentStatement->type) {
         case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
             catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;
@@ -267,7 +273,7 @@ catto_Bool catto_step(catto_Context* context) {
             return CATTO_FALSE;
     }
 
-    return !!context->nextParsedStatement;
+    return context->nextParsedStatement && context->errorState == CATTO_ERROR_STATE_NONE;
 }
 
 void catto_goto(catto_Context* context, catto_Count lineNumber) {
@@ -371,23 +377,7 @@ void catto_load(catto_Context* context, catto_Char* code) {
 }
 
 void catto_run(catto_Context* context) {
-    while (CATTO_TRUE) {
-        catto_AstNode* statement = context->nextParsedStatement;
-
-        if (statement && statement->value.asStatement.lineNumber > 0) {
-            context->subjectLineNumber = statement->value.asStatement.lineNumber;
-        }
-
-        if (!catto_step(context)) {
-            break;
-        }
-
-        catto_gc(context);
-
-        if (context->errorState != CATTO_ERROR_STATE_NONE) {
-            break;
-        }
-    }
+    while (catto_step(context)) {}
 }
 
 void catto_command_print(catto_Context* context) {

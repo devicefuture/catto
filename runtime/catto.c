@@ -1,6 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <malloc.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
 #include <catto-config.h>
 #include <catto.h>
 
@@ -22,6 +27,7 @@ char* assembleLines() {
 
     while (currentLine) {
         code = catto_appendToString(code, currentLine->code);
+        code = catto_appendCharToString(code, '\n');
 
         currentLine = currentLine->nextLine;
     }
@@ -29,7 +35,70 @@ char* assembleLines() {
     return code;
 }
 
+bool readLine(char** line) {
+    unsigned int i = 0;
+
+    if (*line == NULL) {
+        *line = malloc(1);
+    } else {
+        *line = realloc(*line, 1);
+    }
+
+    (*line)[0] = '\0';
+
+    while (true) {
+        int c = getchar();
+
+        if (c < 0) {
+            continue;
+        }
+
+        if (c == '\n') { // Newline
+            putc('\n', stdout);
+
+            return true;
+        }
+
+        if (c == '\e') { // Escape
+            putc('\n', stdout);
+
+            return false;
+        }
+
+        if (c == 127) { // Backspace
+            if (i == 0) {
+                continue;
+            }
+
+            *line = realloc(*line, i);
+
+            (*line)[i--] = '\0';
+
+            printf("\b \b");
+
+            continue;
+        }
+
+        *line = realloc(*line, i + 1);
+
+        putc(c, stdout);
+
+        (*line)[i++] = c;
+        (*line)[i] = '\0';
+    }
+}
+
 int main(int argc, char* argv[]) {
+    struct termios attributes;
+
+    tcgetattr(STDIN_FILENO, &attributes);
+
+    attributes.c_lflag &= ~(ICANON | ECHO);
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &attributes);
+
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+
     printf("Welcome to catto\n");
     printf("Ready\n");
 
@@ -46,13 +115,20 @@ int main(int argc, char* argv[]) {
             printf("Memory usage: %d\n", mallinfo2().uordblks);
         #endif
 
-        getline(&lineString, &size, stdin);
+        readLine(&lineString);
 
-        if (catto_stringsEqual(lineString, "run\n")) {
+        if (catto_stringsEqual(lineString, "run")) {
             char* code = assembleLines();
+            bool interrupted = false;
 
             catto_load(context, code);
-            catto_run(context);
+
+            while (catto_step(context)) {
+                if (getchar() == '\e') { // Escape
+                    interrupted = true;
+                    break;
+                }
+            }
 
             catto_Char* message = "Unknown error";
 
@@ -76,16 +152,16 @@ int main(int argc, char* argv[]) {
 
             free(code);
 
-            printf("Ready\n");
+            printf(interrupted ? "Interrupt\n" : "Ready\n");
 
             continue;
         }
 
-        if (catto_stringsEqual(lineString, "list\n")) {
+        if (catto_stringsEqual(lineString, "list")) {
             Line* currentLine = firstLine;
 
             while (currentLine) {
-                printf("%s", currentLine->code);
+                printf("%s\n", currentLine->code);
 
                 currentLine = currentLine->nextLine;
             }

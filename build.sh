@@ -42,5 +42,5 @@ EOF
 mkdir -p runtime/build
 mkdir -p examples/build
 
-$CC -Idist/ runtime/catto.c -o runtime/build/catto
+$CC -Idist/ runtime/catto.c -lncurses -o runtime/build/catto
 $CC -Idist/ examples/hello.c -o examples/build/hello
