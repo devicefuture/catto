@@ -11,6 +11,8 @@
 
 // #define DEBUG_MEMORY
 
+bool interrupted = false;
+
 typedef struct Line {
     unsigned int lineNumber;
     char* code;
@@ -70,7 +72,7 @@ bool readLine(char** line) {
                 continue;
             }
 
-            *line = realloc(*line, i);
+            *line = realloc(*line, i + 1);
 
             (*line)[i--] = '\0';
 
@@ -79,13 +81,37 @@ bool readLine(char** line) {
             continue;
         }
 
-        *line = realloc(*line, i + 1);
+        *line = realloc(*line, i + 2);
 
         putc(c, stdout);
 
         (*line)[i++] = c;
         (*line)[i] = '\0';
     }
+}
+
+void inputCommand(catto_Context* context) {
+    char* string = catto_asString(catto_evalNextArg(context));
+
+    printf("%s", string);
+
+    free(string);
+
+    catto_AstNode* identifier = catto_getNextArg(context);
+
+    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    char* line = CATTO_NULL;
+    bool finished = readLine(&line);
+
+    if (!finished) {
+        return;
+    }
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, catto_asTypedString(line));
 }
 
 int main(int argc, char* argv[]) {
@@ -105,6 +131,7 @@ int main(int argc, char* argv[]) {
     catto_Context* context = catto_newContext();
 
     catto_addContextStandardCommands(context);
+    catto_addCommand(context, "input", &inputCommand);
 
     char* lineString = NULL;
 
@@ -119,13 +146,17 @@ int main(int argc, char* argv[]) {
 
         if (catto_stringsEqual(lineString, "run")) {
             char* code = assembleLines();
-            bool interrupted = false;
+
+            interrupted = false;
 
             catto_load(context, code);
 
             while (catto_step(context)) {
                 if (getchar() == '\e') { // Escape
                     interrupted = true;
+                }
+
+                if (interrupted) {
                     break;
                 }
             }
