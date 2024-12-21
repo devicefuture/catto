@@ -1,5 +1,7 @@
 catto_Char* catto_operators[] = {
-    "+", "-", "*", "/", "div", "mod", "^", "&", "|", "~",
+    "+", "-", "*", "/", "div", "mod", "^",
+    "&", "|", "~", "¬",
+    "<<", ">>",
     "!=", "<=", ">=", "=", "<", ">",
     "and", "or", "xor", "not",
     ";",
@@ -10,6 +12,7 @@ catto_Char** catto_operatorPrecedence[] = {
     (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
     (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
     (catto_Char*[]) {";", CATTO_NULL},
+    (catto_Char*[]) {"<<", ">>", CATTO_NULL},
     (catto_Char*[]) {"+", "-", CATTO_NULL},
     (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
     (catto_Char*[]) {"^", CATTO_NULL},
@@ -20,6 +23,7 @@ catto_Char** catto_operatorPrecedence[] = {
 catto_Char* catto_unaryOperators[] = {
     "+",
     "-",
+    "¬",
     "not",
     CATTO_NULL
 };
@@ -57,6 +61,9 @@ CATTO_BINARY_INTEGER_OPERATOR(catto_binary_integerDivide, /);
 CATTO_BINARY_INTEGER_OPERATOR(catto_binary_modulo, %);
 CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitwiseAnd, &);
 CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitwiseOr, |);
+CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitwiseXor, ^);
+CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitShiftLeft, <<);
+CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitShiftRight, >>);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_notEqual, !=);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_lessThanOrEqual, <=);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_greaterThanOrEqual, >=);
@@ -103,7 +110,10 @@ catto_OperatorMapping catto_operatorMappings[] = {
     {"^", CATTO_NULL, catto_binary_power},
     {"&", CATTO_NULL, catto_binary_bitwiseAnd},
     {"|", CATTO_NULL, catto_binary_bitwiseOr},
-    {"~", catto_unary_bitwiseNot, CATTO_NULL},
+    {"~", CATTO_NULL, catto_binary_bitwiseXor},
+    {"¬", catto_unary_bitwiseNot, CATTO_NULL},
+    {"<<", CATTO_NULL, catto_binary_bitShiftLeft},
+    {">>", CATTO_NULL, catto_binary_bitShiftRight},
     {"!=", CATTO_NULL, catto_binary_notEqual},
     {"<=", CATTO_NULL, catto_binary_lessThanOrEqual},
     {">=", CATTO_NULL, catto_binary_greaterThanOrEqual},
