@@ -254,6 +254,7 @@ catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
+catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
@@ -495,17 +496,15 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value) {
     catto_TypedValue* existingVariableValue = catto_getVariable(context, name);
 
-    catto_removeTypedValueFromGc(context, value);
-
     if (existingVariableValue) {
         catto_addTypedValueToGc(context, *existingVariableValue);
 
-        *existingVariableValue = value;
+        *existingVariableValue = catto_copyTypedValue(value);
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
         variable->name = catto_copyString(name);
-        variable->value = value;
+        variable->value = catto_copyTypedValue(value);
         variable->nextVariable = CATTO_NULL;
 
         if (!context->firstVariable) {
@@ -1614,6 +1613,14 @@ void catto_freeTypedValue(catto_TypedValue* valuePtr) {
     }
 
     CATTO_FREE(valuePtr);
+}
+
+catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        value.value.asString = catto_copyString(value.value.asString);
+    }
+
+    return value;
 }
 
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {

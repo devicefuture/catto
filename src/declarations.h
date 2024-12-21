@@ -176,6 +176,7 @@ catto_Char* catto_asString(catto_TypedValue value);
 catto_TypedValue catto_asTypedString(catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
+catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 

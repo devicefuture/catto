@@ -94,17 +94,15 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value) {
     catto_TypedValue* existingVariableValue = catto_getVariable(context, name);
 
-    catto_removeTypedValueFromGc(context, value);
-
     if (existingVariableValue) {
         catto_addTypedValueToGc(context, *existingVariableValue);
 
-        *existingVariableValue = value;
+        *existingVariableValue = catto_copyTypedValue(value);
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
         variable->name = catto_copyString(name);
-        variable->value = value;
+        variable->value = catto_copyTypedValue(value);
         variable->nextVariable = CATTO_NULL;
 
         if (!context->firstVariable) {

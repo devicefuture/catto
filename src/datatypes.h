@@ -62,6 +62,14 @@ void catto_freeTypedValue(catto_TypedValue* valuePtr) {
     CATTO_FREE(valuePtr);
 }
 
+catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_STRING) {
+        value.value.asString = catto_copyString(value.value.asString);
+    }
+
+    return value;
+}
+
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
         catto_addPointerToGc(context, value.value.asString);
