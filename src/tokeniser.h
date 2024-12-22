@@ -61,7 +61,7 @@ catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_
     catto_CommandHandler* currentCommandHandler = context->firstCommandHandler;
 
     while (currentCommandHandler) {
-        if (catto_stringStartsWith(code + index, currentCommandHandler->name)) {
+        if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
             catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
 
             token->value.asCommandHandler = currentCommandHandler;
@@ -77,14 +77,14 @@ catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
     while (matchStrings[i]) {
         catto_Char* currentString = matchStrings[i];
 
-        if (catto_stringStartsWith(code + index, currentString)) {
+        if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
             catto_Token* token = catto_addToken(type, currentTokenPtr);
 
             token->value.asString = currentString;
@@ -289,7 +289,7 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
             continue;
         }
 

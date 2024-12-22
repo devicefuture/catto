@@ -241,6 +241,7 @@ catto_Char* catto_numberToString(catto_Float number);
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b);
 catto_Char* catto_copyString(catto_Char* string);
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
@@ -493,7 +494,7 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     catto_Variable* currentVariable = context->firstVariable;
 
     while (currentVariable) {
-        if (catto_stringsEqual(currentVariable->name, name)) {
+        if (catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
             return &(currentVariable->value);
         }
 
@@ -566,7 +567,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         while (catto_operatorMappings[i].operator) {
             catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[i];
 
-            if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+            if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
                 catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
 
                 if (function) {
@@ -595,7 +596,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
             while (catto_operatorMappings[j].operator) {
                 catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[j];
 
-                if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+                if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
                     catto_BinaryOperatorFunction function = currentOperatorMapping.binaryFunction;
 
                     if (function) {
@@ -1355,14 +1356,28 @@ catto_Count catto_stringLength(catto_Char* string) {
     return length;
 }
 
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+catto_Bool _catto_charsEqual(catto_Char a, catto_Char b, catto_Bool caseInsensitive) {
+    if (caseInsensitive) {
+        if (a >= 'A' && a <= 'Z') {
+            a += 32;
+        }
+
+        if (b >= 'A' && b <= 'Z') {
+            b += 32;
+        }
+    }
+
+    return a == b;
+}
+
+catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
         return CATTO_TRUE;
     }
 
-    while (a[i] == b[i]) {
+    while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
         if (a[i] == '\0') {
             if (b[i] == '\0') {
                 return CATTO_TRUE;
@@ -1379,6 +1394,14 @@ catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
     }
 
     return CATTO_FALSE;
+}
+
+catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+    return _catto_stringsEqual(a, b, CATTO_FALSE);
+}
+
+catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b) {
+    return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
 catto_Char* catto_copyString(catto_Char* string) {
@@ -1431,14 +1454,14 @@ catto_Char* catto_reverseString(catto_Char* string) {
     return string;
 }
 
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
         return CATTO_TRUE;
     }
 
-    while (a[i] == b[i]) {
+    while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
         if (a[i] == '\0') {
             if (b[i] == '\0') {
                 return CATTO_TRUE;
@@ -1455,6 +1478,14 @@ catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
     }
 
     return CATTO_FALSE;
+}
+
+catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+    return _catto_stringStartsWith(a, b, CATTO_FALSE);
+}
+
+catto_Bool catto_stringStartsWithCaseInsensitive(catto_Char* a, catto_Char* b) {
+    return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
 // @source https://stackoverflow.com/a/4392789
@@ -1710,7 +1741,7 @@ catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_
     catto_CommandHandler* currentCommandHandler = context->firstCommandHandler;
 
     while (currentCommandHandler) {
-        if (catto_stringStartsWith(code + index, currentCommandHandler->name)) {
+        if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
             catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
 
             token->value.asCommandHandler = currentCommandHandler;
@@ -1726,14 +1757,14 @@ catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
     while (matchStrings[i]) {
         catto_Char* currentString = matchStrings[i];
 
-        if (catto_stringStartsWith(code + index, currentString)) {
+        if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
             catto_Token* token = catto_addToken(type, currentTokenPtr);
 
             token->value.asString = currentString;
@@ -1938,7 +1969,7 @@ catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, code, &index, &currentToken)) {
+        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
             continue;
         }
 
@@ -2032,11 +2063,11 @@ catto_Token* catto_eatIfKeyword(catto_Token** currentTokenPtr, catto_Char* keywo
     }
 
     if (
-        ((*currentTokenPtr)->type == CATTO_TOKEN_TYPE_COMMAND && catto_stringsEqual((*currentTokenPtr)->value.asCommandHandler->name, keyword)) ||
+        ((*currentTokenPtr)->type == CATTO_TOKEN_TYPE_COMMAND && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asCommandHandler->name, keyword)) ||
         ((
             (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_IDENTIFIER ||
             (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR
-        ) && catto_stringsEqual((*currentTokenPtr)->value.asString, keyword))
+        ) && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asString, keyword))
     ) {
         return catto_eat(currentTokenPtr);
     }
@@ -2138,7 +2169,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
 
     if (
-        *currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR && catto_stringsEqual((*currentTokenPtr)->value.asString, ";") &&
+        *currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asString, ";") &&
         (
             !tokenPtrAfter || (tokenPtrAfter && (
                 tokenPtrAfter->type == CATTO_TOKEN_TYPE_NEXT_LINE ||
@@ -2165,7 +2196,7 @@ catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Coun
     catto_Count i = 0;
 
     while (operatorsAtLevel[i]) {
-        if (catto_stringsEqual(operatorsAtLevel[i], token->value.asString)) {
+        if (catto_stringsEqualCaseInsensitive(operatorsAtLevel[i], token->value.asString)) {
             return CATTO_TRUE;
         }
 
@@ -2190,7 +2221,7 @@ catto_AstNode* catto_parseUnaryExpression(catto_Token** currentTokenPtr, catto_A
     catto_Bool operatorIsUnary = CATTO_FALSE;
 
     while (catto_unaryOperators[i]) {
-        if (catto_stringsEqual(catto_unaryOperators[i], operator->value.asString)) {
+        if (catto_stringsEqualCaseInsensitive(catto_unaryOperators[i], operator->value.asString)) {
             operatorIsUnary = CATTO_TRUE;
             break;
         }
@@ -2350,7 +2381,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         catto_AstNode* firstArgument = CATTO_NULL;
         catto_AstNode* currentArgument = CATTO_NULL;
 
-        if (catto_stringsEqual(commandName, "else")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "else")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
 
             if (!catto_eatIfKeyword(currentTokenPtr, "if")) {
@@ -2360,7 +2391,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             catto_parseExpression(currentTokenPtr, &currentArgument);
         }
 
-        if (catto_stringsEqual(commandName, "for")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "for")) {
             firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
 
             if (!catto_eatIfKeyword(currentTokenPtr, "=")) {
@@ -2380,7 +2411,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             }
         }
 
-        if (catto_stringsEqual(commandName, "while") || catto_stringsEqual(commandName, "until")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "while") || catto_stringsEqualCaseInsensitive(commandName, "until")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
 
@@ -2417,7 +2448,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
         catto_Token* assignmentOperatorToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
 
-        if (!assignmentOperatorToken || !catto_stringsEqual(assignmentOperatorToken->value.asString, "=")) {
+        if (!assignmentOperatorToken || !catto_stringsEqualCaseInsensitive(assignmentOperatorToken->value.asString, "=")) {
             goto syntaxError;
         }
 
@@ -2483,7 +2514,7 @@ catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command) {
 
     catto_CommandHandler* commandHandler = astNode->value.asStatement.attributes.asCommandHandler;
 
-    return commandHandler && catto_stringsEqual(commandHandler->name, command);
+    return commandHandler && catto_stringsEqualCaseInsensitive(commandHandler->name, command);
 }
 
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode) {

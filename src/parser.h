@@ -24,11 +24,11 @@ catto_Token* catto_eatIfKeyword(catto_Token** currentTokenPtr, catto_Char* keywo
     }
 
     if (
-        ((*currentTokenPtr)->type == CATTO_TOKEN_TYPE_COMMAND && catto_stringsEqual((*currentTokenPtr)->value.asCommandHandler->name, keyword)) ||
+        ((*currentTokenPtr)->type == CATTO_TOKEN_TYPE_COMMAND && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asCommandHandler->name, keyword)) ||
         ((
             (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_IDENTIFIER ||
             (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR
-        ) && catto_stringsEqual((*currentTokenPtr)->value.asString, keyword))
+        ) && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asString, keyword))
     ) {
         return catto_eat(currentTokenPtr);
     }
@@ -130,7 +130,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
 
     if (
-        *currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR && catto_stringsEqual((*currentTokenPtr)->value.asString, ";") &&
+        *currentTokenPtr && (*currentTokenPtr)->type == CATTO_TOKEN_TYPE_OPERATOR && catto_stringsEqualCaseInsensitive((*currentTokenPtr)->value.asString, ";") &&
         (
             !tokenPtrAfter || (tokenPtrAfter && (
                 tokenPtrAfter->type == CATTO_TOKEN_TYPE_NEXT_LINE ||
@@ -157,7 +157,7 @@ catto_Bool catto_matchesInOperatorPrecedenceLevel(catto_Token* token, catto_Coun
     catto_Count i = 0;
 
     while (operatorsAtLevel[i]) {
-        if (catto_stringsEqual(operatorsAtLevel[i], token->value.asString)) {
+        if (catto_stringsEqualCaseInsensitive(operatorsAtLevel[i], token->value.asString)) {
             return CATTO_TRUE;
         }
 
@@ -182,7 +182,7 @@ catto_AstNode* catto_parseUnaryExpression(catto_Token** currentTokenPtr, catto_A
     catto_Bool operatorIsUnary = CATTO_FALSE;
 
     while (catto_unaryOperators[i]) {
-        if (catto_stringsEqual(catto_unaryOperators[i], operator->value.asString)) {
+        if (catto_stringsEqualCaseInsensitive(catto_unaryOperators[i], operator->value.asString)) {
             operatorIsUnary = CATTO_TRUE;
             break;
         }
@@ -342,7 +342,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         catto_AstNode* firstArgument = CATTO_NULL;
         catto_AstNode* currentArgument = CATTO_NULL;
 
-        if (catto_stringsEqual(commandName, "else")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "else")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
 
             if (!catto_eatIfKeyword(currentTokenPtr, "if")) {
@@ -352,7 +352,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             catto_parseExpression(currentTokenPtr, &currentArgument);
         }
 
-        if (catto_stringsEqual(commandName, "for")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "for")) {
             firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
 
             if (!catto_eatIfKeyword(currentTokenPtr, "=")) {
@@ -372,7 +372,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             }
         }
 
-        if (catto_stringsEqual(commandName, "while") || catto_stringsEqual(commandName, "until")) {
+        if (catto_stringsEqualCaseInsensitive(commandName, "while") || catto_stringsEqualCaseInsensitive(commandName, "until")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
 
@@ -409,7 +409,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
         catto_Token* assignmentOperatorToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
 
-        if (!assignmentOperatorToken || !catto_stringsEqual(assignmentOperatorToken->value.asString, "=")) {
+        if (!assignmentOperatorToken || !catto_stringsEqualCaseInsensitive(assignmentOperatorToken->value.asString, "=")) {
             goto syntaxError;
         }
 
@@ -475,7 +475,7 @@ catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command) {
 
     catto_CommandHandler* commandHandler = astNode->value.asStatement.attributes.asCommandHandler;
 
-    return commandHandler && catto_stringsEqual(commandHandler->name, command);
+    return commandHandler && catto_stringsEqualCaseInsensitive(commandHandler->name, command);
 }
 
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode) {

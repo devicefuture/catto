@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
 
         readLine(&lineString);
 
-        if (catto_stringsEqual(lineString, "run")) {
+        if (catto_stringsEqualCaseInsensitive(lineString, "run")) {
             char* code = assembleLines();
 
             interrupted = false;
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        if (catto_stringsEqual(lineString, "list")) {
+        if (catto_stringsEqualCaseInsensitive(lineString, "list")) {
             Line* currentLine = firstLine;
 
             while (currentLine) {
@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
 
             Line* currentLine = firstLine;
 
-            if (firstToken->nextToken && firstToken->nextToken->type == CATTO_TOKEN_TYPE_NEXT_LINE) {
+            if (!firstToken->nextToken) {
                 if (firstLine && firstLine->lineNumber == line->lineNumber) {
                     Line* originalFirstLine = firstLine;
 

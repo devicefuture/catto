@@ -11,14 +11,28 @@ catto_Count catto_stringLength(catto_Char* string) {
     return length;
 }
 
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+catto_Bool _catto_charsEqual(catto_Char a, catto_Char b, catto_Bool caseInsensitive) {
+    if (caseInsensitive) {
+        if (a >= 'A' && a <= 'Z') {
+            a += 32;
+        }
+
+        if (b >= 'A' && b <= 'Z') {
+            b += 32;
+        }
+    }
+
+    return a == b;
+}
+
+catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
         return CATTO_TRUE;
     }
 
-    while (a[i] == b[i]) {
+    while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
         if (a[i] == '\0') {
             if (b[i] == '\0') {
                 return CATTO_TRUE;
@@ -35,6 +49,14 @@ catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
     }
 
     return CATTO_FALSE;
+}
+
+catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+    return _catto_stringsEqual(a, b, CATTO_FALSE);
+}
+
+catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b) {
+    return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
 catto_Char* catto_copyString(catto_Char* string) {
@@ -87,14 +109,14 @@ catto_Char* catto_reverseString(catto_Char* string) {
     return string;
 }
 
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
         return CATTO_TRUE;
     }
 
-    while (a[i] == b[i]) {
+    while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
         if (a[i] == '\0') {
             if (b[i] == '\0') {
                 return CATTO_TRUE;
@@ -111,6 +133,14 @@ catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
     }
 
     return CATTO_FALSE;
+}
+
+catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+    return _catto_stringStartsWith(a, b, CATTO_FALSE);
+}
+
+catto_Bool catto_stringStartsWithCaseInsensitive(catto_Char* a, catto_Char* b) {
+    return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
 // @source https://stackoverflow.com/a/4392789

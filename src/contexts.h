@@ -81,7 +81,7 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     catto_Variable* currentVariable = context->firstVariable;
 
     while (currentVariable) {
-        if (catto_stringsEqual(currentVariable->name, name)) {
+        if (catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
             return &(currentVariable->value);
         }
 
@@ -154,7 +154,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         while (catto_operatorMappings[i].operator) {
             catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[i];
 
-            if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+            if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
                 catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
 
                 if (function) {
@@ -183,7 +183,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
             while (catto_operatorMappings[j].operator) {
                 catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[j];
 
-                if (catto_stringsEqual(operator, currentOperatorMapping.operator)) {
+                if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
                     catto_BinaryOperatorFunction function = currentOperatorMapping.binaryFunction;
 
                     if (function) {

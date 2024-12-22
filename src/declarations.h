@@ -163,6 +163,7 @@ catto_Char* catto_numberToString(catto_Float number);
 
 catto_Count catto_stringLength(catto_Char* string);
 catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
+catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b);
 catto_Char* catto_copyString(catto_Char* string);
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
