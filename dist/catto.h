@@ -660,6 +660,30 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
     return DEFAULT_RETURN_VALUE;
 }
 
+catto_Bool catto_hasAppendFlag(catto_AstNode* astNode) {
+    if (astNode->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        return astNode->value.asExpressionLeaf.appendFlag;
+    }
+
+    if (astNode->type == CATTO_AST_NODE_TYPE_UNARY_EXPRESSION) {
+        return catto_hasAppendFlag(astNode->value.asUnaryExpression.child);
+    }
+
+    if (astNode->type == CATTO_AST_NODE_TYPE_BINARY_EXPRESSION) {
+        catto_AstNode* currentChild = astNode->value.asBinaryExpression.firstChild;
+
+        while (currentChild) {
+            if (catto_hasAppendFlag(currentChild)) {
+                return CATTO_TRUE;
+            }
+
+            currentChild = currentChild->nextAstNode;
+        }
+    }
+
+    return CATTO_FALSE;
+}
+
 catto_AstNode* catto_getNextArg(catto_Context* context) {
     catto_AstNode* currentArgument = context->nextParsedArgument;
 
@@ -828,8 +852,15 @@ void catto_run(catto_Context* context) {
 }
 
 void catto_command_print(catto_Context* context) {
+    catto_Bool appendFlag = CATTO_FALSE;
+
     while (catto_hasNextArg(context)) {
-        catto_Char* string = catto_asString(catto_evalNextArg(context));
+        catto_AstNode* arg = catto_getNextArg(context);
+        catto_Char* string = catto_asString(catto_evalExpression(context, arg));
+
+        if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
+            appendFlag = CATTO_TRUE;
+        }
 
         CATTO_LOG(string);
         CATTO_FREE(string);
@@ -839,7 +870,9 @@ void catto_command_print(catto_Context* context) {
         }
     }
 
-    CATTO_LOG("\n");
+    if (!appendFlag) {
+        CATTO_LOG("\n");
+    }
 }
 
 void catto_command_goto(catto_Context* context) {
