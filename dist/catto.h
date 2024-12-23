@@ -146,6 +146,7 @@ typedef struct catto_Token {
 } catto_Token;
 
 typedef enum {
+    CATTO_DATA_TYPE_NULL = '\0',
     CATTO_DATA_TYPE_NUMBER = '%',
     CATTO_DATA_TYPE_STRING = '$'
 } catto_DataType;
@@ -221,6 +222,7 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
+catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
@@ -256,6 +258,7 @@ catto_TypedValue catto_asTypedString(catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
+catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type);
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
@@ -490,6 +493,24 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     context->lastCommandHandler = commandHandler;
 }
 
+catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
+    catto_Count i = 0;
+
+    while (name[i]) {
+        if (name[i] == '$' || name[i] == '%') {
+            catto_DataType type = name[i];
+
+            name[i] = CATTO_NULL;
+
+            return type;
+        }
+
+        i++;
+    }
+
+    return '\0';
+}
+
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     catto_Variable* currentVariable = context->firstVariable;
 
@@ -514,7 +535,10 @@ void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValu
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
-        variable->name = catto_copyString(name);
+        catto_Char* untypedName = catto_copyString(name);
+        catto_DataType type = catto_removeTypeFromVariableName(untypedName);
+
+        variable->name = untypedName;
         variable->value = catto_copyTypedValue(value);
         variable->nextVariable = CATTO_NULL;
 
@@ -552,10 +576,22 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         catto_Char* subjectVariable = astNode->value.asExpressionLeaf.subjectVariable;
 
         if (subjectVariable) {
-            catto_TypedValue* variableValue = catto_getVariable(context, subjectVariable);
+            catto_Char* untypedSubjectVariable = catto_copyString(subjectVariable);
+            catto_DataType type = catto_removeTypeFromVariableName(untypedSubjectVariable);
+            catto_TypedValue* variableValue = catto_getVariable(context, untypedSubjectVariable);
+
+            CATTO_FREE(untypedSubjectVariable);
 
             if (variableValue) {
-                return *variableValue;
+                if (type == CATTO_DATA_TYPE_NULL) {
+                    return *variableValue;
+                }
+
+                catto_TypedValue castedValue = catto_castTypedValue(*variableValue, type);
+
+                catto_addTypedValueToGc(context, castedValue);
+
+                return castedValue;
             }
         }
     }
@@ -1659,6 +1695,24 @@ void catto_freeTypedValue(catto_TypedValue* valuePtr) {
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
         value.value.asString = catto_copyString(value.value.asString);
+    }
+
+    return value;
+}
+
+catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
+    if (type == CATTO_DATA_TYPE_NULL) {
+        return catto_copyTypedValue(value);
+    }
+
+    if (type == CATTO_DATA_TYPE_NUMBER) {
+        value.value.asNumber = catto_asNumber(value);
+        value.type = CATTO_DATA_TYPE_NUMBER;
+    }
+
+    if (type == CATTO_DATA_TYPE_STRING) {
+        value.value.asString = catto_asString(value);
+        value.type = CATTO_DATA_TYPE_STRING;
     }
 
     return value;

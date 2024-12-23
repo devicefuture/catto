@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
                 "30 print \"x is:\", x\n"
                 "40 print \"concat \"; x\n"
                 "50 y=x; \" concat\"\n"
-                "60 print y"
+                "60 print y$"
             );
 
             catto_run(context);

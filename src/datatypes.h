@@ -70,6 +70,24 @@ catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     return value;
 }
 
+catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
+    if (type == CATTO_DATA_TYPE_NULL) {
+        return catto_copyTypedValue(value);
+    }
+
+    if (type == CATTO_DATA_TYPE_NUMBER) {
+        value.value.asNumber = catto_asNumber(value);
+        value.type = CATTO_DATA_TYPE_NUMBER;
+    }
+
+    if (type == CATTO_DATA_TYPE_STRING) {
+        value.value.asString = catto_asString(value);
+        value.type = CATTO_DATA_TYPE_STRING;
+    }
+
+    return value;
+}
+
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
         catto_addPointerToGc(context, value.value.asString);

@@ -77,6 +77,24 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     context->lastCommandHandler = commandHandler;
 }
 
+catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
+    catto_Count i = 0;
+
+    while (name[i]) {
+        if (name[i] == '$' || name[i] == '%') {
+            catto_DataType type = name[i];
+
+            name[i] = CATTO_NULL;
+
+            return type;
+        }
+
+        i++;
+    }
+
+    return '\0';
+}
+
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     catto_Variable* currentVariable = context->firstVariable;
 
@@ -101,7 +119,10 @@ void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValu
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
-        variable->name = catto_copyString(name);
+        catto_Char* untypedName = catto_copyString(name);
+        catto_DataType type = catto_removeTypeFromVariableName(untypedName);
+
+        variable->name = untypedName;
         variable->value = catto_copyTypedValue(value);
         variable->nextVariable = CATTO_NULL;
 
@@ -139,10 +160,22 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         catto_Char* subjectVariable = astNode->value.asExpressionLeaf.subjectVariable;
 
         if (subjectVariable) {
-            catto_TypedValue* variableValue = catto_getVariable(context, subjectVariable);
+            catto_Char* untypedSubjectVariable = catto_copyString(subjectVariable);
+            catto_DataType type = catto_removeTypeFromVariableName(untypedSubjectVariable);
+            catto_TypedValue* variableValue = catto_getVariable(context, untypedSubjectVariable);
+
+            CATTO_FREE(untypedSubjectVariable);
 
             if (variableValue) {
-                return *variableValue;
+                if (type == CATTO_DATA_TYPE_NULL) {
+                    return *variableValue;
+                }
+
+                catto_TypedValue castedValue = catto_castTypedValue(*variableValue, type);
+
+                catto_addTypedValueToGc(context, castedValue);
+
+                return castedValue;
             }
         }
     }

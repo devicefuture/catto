@@ -68,6 +68,7 @@ typedef struct catto_Token {
 } catto_Token;
 
 typedef enum {
+    CATTO_DATA_TYPE_NULL = '\0',
     CATTO_DATA_TYPE_NUMBER = '%',
     CATTO_DATA_TYPE_STRING = '$'
 } catto_DataType;
@@ -143,6 +144,7 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
+catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
@@ -178,6 +180,7 @@ catto_TypedValue catto_asTypedString(catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
+catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type);
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
