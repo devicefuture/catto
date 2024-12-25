@@ -21,3 +21,5 @@ To run the example code (found at `examples/hello.c`), run:
 ```
 examples/build/hello
 ```
+
+Compile with `TEST_MEMORY` defined to run catto in an infinite loop, which can then be used with a process monitor to check for memory leaks.
