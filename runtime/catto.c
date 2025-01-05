@@ -90,6 +90,46 @@ bool readLine(char** line) {
     }
 }
 
+void runCode(catto_Context* context, char* code) {
+    interrupted = false;
+
+    catto_load(context, code);
+
+    while (catto_step(context)) {
+        if (getchar() == '\e') { // Escape
+            interrupted = true;
+        }
+
+        if (interrupted) {
+            break;
+        }
+    }
+
+    catto_Char* message = "Unknown error";
+
+    switch (context->errorState) {
+        case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
+        case CATTO_ERROR_STATE_NO_RETURN: message = "Nothing to return to"; break;
+        case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
+        case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
+        case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;
+
+        default: break;
+    }
+
+    if (context->errorState != CATTO_ERROR_STATE_NONE) {
+        if (context->subjectLineNumber > 0) {
+            printf("%s at line %d\n", message, context->subjectLineNumber);
+        } else {
+            printf("%s\n", message);
+        }
+    }
+
+    free(code);
+
+    printf(interrupted ? "Interrupt\n" : "Ready\n");
+}
+
 void inputCommand(catto_Context* context) {
     char* string = catto_asString(catto_evalNextArg(context));
 
@@ -144,46 +184,14 @@ int main(int argc, char* argv[]) {
 
         readLine(&lineString);
 
+        if (catto_stringsEqualCaseInsensitive(lineString, "exit")) {
+            printf("Goodbye\n");
+
+            return 0;
+        }
+
         if (catto_stringsEqualCaseInsensitive(lineString, "run")) {
-            char* code = assembleLines();
-
-            interrupted = false;
-
-            catto_load(context, code);
-
-            while (catto_step(context)) {
-                if (getchar() == '\e') { // Escape
-                    interrupted = true;
-                }
-
-                if (interrupted) {
-                    break;
-                }
-            }
-
-            catto_Char* message = "Unknown error";
-
-            switch (context->errorState) {
-                case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
-                case CATTO_ERROR_STATE_NO_RETURN: message = "Nothing to return to"; break;
-                case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
-                case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
-                case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;
-
-                default: break;
-            }
-
-            if (context->errorState != CATTO_ERROR_STATE_NONE) {
-                if (context->subjectLineNumber > 0) {
-                    printf("%s at line %d\n", message, context->subjectLineNumber);
-                } else {
-                    printf("%s\n", message);
-                }
-            }
-
-            free(code);
-
-            printf(interrupted ? "Interrupt\n" : "Ready\n");
+            runCode(context, assembleLines());
 
             continue;
         }
@@ -282,5 +290,7 @@ int main(int argc, char* argv[]) {
 
             continue;
         }
+
+        runCode(context, catto_copyString(lineString));
     }
 }
