@@ -1937,7 +1937,7 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
         currentString[currentStringIndex++] = currentChar;
         currentString[currentStringIndex] = '\0';
 
-        if (currentStringIndex + 1 == sizeof(currentString)) {
+        if ((currentStringIndex + 1) % 8 == 0) {
             currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
         }
     }
@@ -1991,7 +1991,7 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
         currentString[currentStringIndex++] = currentChar;
         currentString[currentStringIndex] = '\0';
 
-        if (currentStringIndex + 1 == sizeof(currentString)) {
+        if ((currentStringIndex + 1) % 8 == 0) {
             currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
         }
     }
