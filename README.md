@@ -2,11 +2,13 @@
 A C runtime library for the [atto programming language](https://atto.devicefuture.org).
 
 ## Building
-To build catto, run:
+To build the catto library, run:
 
 ```bash
 ./build.sh
 ```
+
+The library will be built as a single header file in the `dist` directory. The interpreter and example code will also be built.
 
 ## Running the interpreter
 To start the interpreter, run:
