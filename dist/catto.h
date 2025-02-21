@@ -2252,6 +2252,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     astNode->value.asExpressionLeaf.value = value;
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
     astNode->value.asExpressionLeaf.index = index;
+    astNode->value.asExpressionLeaf.appendFlag = CATTO_FALSE;
 
     catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
 
