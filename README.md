@@ -17,6 +17,8 @@ To start the interpreter, run:
 runtime/build/catto
 ```
 
+To interrupt running programs, press <kbd>esc</kbd>. To exit the interpreter, type `exit`.
+
 ## Running the example
 To run the example code (found at `examples/hello.c`), run:
 
