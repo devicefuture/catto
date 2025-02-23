@@ -156,9 +156,11 @@ void inputCommand(catto_Context* context) {
 
 int main(int argc, char* argv[]) {
     struct termios attributes;
+    struct termios originalAttributes;
 
     tcgetattr(STDIN_FILENO, &attributes);
 
+    originalAttributes = attributes;
     attributes.c_lflag &= ~(ICANON | ECHO);
 
     tcsetattr(STDIN_FILENO, TCSANOW, &attributes);
@@ -186,6 +188,8 @@ int main(int argc, char* argv[]) {
 
         if (catto_stringsEqualCaseInsensitive(lineString, "exit")) {
             printf("Goodbye\n");
+
+            tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
 
             return 0;
         }
