@@ -9,7 +9,7 @@
 #include <catto-config.h>
 #include <catto.h>
 
-// #define DEBUG_MEMORY
+#define DEBUG_MEMORY
 
 bool interrupted = false;
 
@@ -148,10 +148,18 @@ void inputCommand(catto_Context* context) {
     bool finished = readLine(&line);
 
     if (!finished) {
+        free(line);
         return;
     }
 
-    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, catto_asTypedString(line));
+    catto_TypedValue value = {
+        .type = CATTO_DATA_TYPE_STRING,
+        .value.asString = line
+    };
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, value);
+
+    free(line);
 }
 
 int main(int argc, char* argv[]) {
