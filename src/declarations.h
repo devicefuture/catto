@@ -4,8 +4,16 @@ typedef enum {
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
-    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
+    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
+    CATTO_ERROR_STATE_NOT_A_FUNCTION
 } catto_ErrorState;
+
+typedef enum {
+    CATTO_DATA_TYPE_NULL = '\0',
+    CATTO_DATA_TYPE_NUMBER = '%',
+    CATTO_DATA_TYPE_STRING = '$',
+    CATTO_DATA_TYPE_FUNCTION = 'f'
+} catto_DataType;
 
 typedef enum {
     CATTO_MARK_SEARCH_ALL,
@@ -31,6 +39,7 @@ typedef struct catto_Context {
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
+typedef struct catto_TypedValue (*catto_FunctionHandlerFunction)(catto_Context* context, catto_DataType returnType);
 
 typedef struct catto_CommandHandler {
     catto_Char* name;
@@ -67,17 +76,12 @@ typedef struct catto_Token {
     struct catto_Token* nextToken;
 } catto_Token;
 
-typedef enum {
-    CATTO_DATA_TYPE_NULL = '\0',
-    CATTO_DATA_TYPE_NUMBER = '%',
-    CATTO_DATA_TYPE_STRING = '$'
-} catto_DataType;
-
 typedef struct catto_TypedValue {
     catto_DataType type;
     union {
         catto_Float asNumber;
         catto_Char* asString;
+        catto_FunctionHandlerFunction asFunction;
     } value;
 } catto_TypedValue;
 
@@ -114,6 +118,7 @@ typedef struct catto_AstNode {
         struct {
             catto_TypedValue* value;
             catto_Char* subjectVariable;
+            struct catto_AstNode* firstArgument;
             struct catto_AstNode* index;
             catto_Bool appendFlag;
         } asExpressionLeaf;

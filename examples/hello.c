@@ -31,7 +31,8 @@ int main(int argc, char* argv[]) {
         "40 print 10 - 9 - 8 - 7 - 6\n"
         "50 print 6 * (4 + 5)\n"
         "60 print -5, 6 + 5 * -3, -(2 + 4)\n"
-        "60 print var, var[5], var[2 + 3]"
+        "70 print abs(-3.5), upper(\"Testing\"), max(1, 3)\n"
+        "80 print var, var[5], var[2 + 3]"
     );
 
     printf("Tokens: ");
@@ -47,7 +48,9 @@ int main(int argc, char* argv[]) {
     catto_load(
         context,
         "10 print \"Hello, world!\"\n"
-        "20 print 1, 2 + 4 - 1 + 4 - 7, -3, 4.59e-8, (3.7 * (4.6 + 9.1))^3, 1 + 2 * 3 = 7 and 5 > 3"
+        "20 print 1, 2 + 4 - 1 + 4 - 7, -3, 4.59e-8, (3.7 * (4.6 + 9.1))^3, 1 + 2 * 3 = 7 and 5 > 3\n"
+        "70 print round(-3.5), floor(-3.5), ceil(-3.5), abs(-3.5)\n"
+        "80 print upper(\"Testing!\"), max(1, 3)"
     );
 
     catto_run(context);
@@ -63,7 +66,9 @@ int main(int argc, char* argv[]) {
                 "30 print \"x is:\", x\n"
                 "40 print \"concat \"; x\n"
                 "50 y=x; \" concat\"\n"
-                "60 print y$"
+                "60 print y$\n"
+                "70 print max(1, 3)\n"
+                "80 print upper(\"Hello, world!\")"
             );
 
             catto_run(context);

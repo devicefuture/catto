@@ -113,6 +113,7 @@ void runCode(catto_Context* context, char* code) {
         case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
         case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
         case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;
+        case CATTO_ERROR_STATE_NOT_A_FUNCTION: message = "Attempt to call variable that is not a function"; break;
 
         default: break;
     }

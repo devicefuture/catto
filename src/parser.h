@@ -61,6 +61,7 @@ catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode*
 
     astNode->value.asExpressionLeaf.value = valuePtr;
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
+    astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
 
     return astNode;
@@ -83,6 +84,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 
     catto_TypedValue* value = CATTO_NULL;
     catto_Char* subjectVariable = CATTO_NULL;
+    catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* index = CATTO_NULL;
 
     switch (token->type) {
@@ -105,6 +107,28 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
         case CATTO_TOKEN_TYPE_IDENTIFIER:
             subjectVariable = catto_copyString(token->value.asString);
 
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_BRACKET)) {
+                catto_AstNode* currentArgument = CATTO_NULL;
+
+                while (CATTO_TRUE) {
+                    if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_BRACKET)) {
+                        break;
+                    }
+
+                    if (firstArgument && !catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
+                        return CATTO_NULL;
+                    }
+
+                    if (!catto_parseExpression(currentTokenPtr, &currentArgument)) {
+                        return CATTO_NULL;
+                    }
+
+                    if (!firstArgument) {
+                        firstArgument = currentArgument;
+                    }
+                }
+            }
+
             if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
                 if (!catto_parseExpression(currentTokenPtr, &index)) {
                     return CATTO_NULL;
@@ -125,6 +149,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 
     astNode->value.asExpressionLeaf.value = value;
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
+    astNode->value.asExpressionLeaf.firstArgument = firstArgument;
     astNode->value.asExpressionLeaf.index = index;
     astNode->value.asExpressionLeaf.appendFlag = CATTO_FALSE;
 
@@ -623,6 +648,7 @@ void catto_freeAstNodes(catto_AstNode* firstAstNode) {
             case CATTO_AST_NODE_TYPE_EXPRESSION_LEAF:
                 catto_freeTypedValue(currentAstNode->value.asExpressionLeaf.value);
 
+                catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.firstArgument);
                 catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.index);
 
                 CATTO_FREE(currentAstNode->value.asExpressionLeaf.subjectVariable);
@@ -663,6 +689,10 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
         }
 
         switch (currentAstNode->type) {
+            case CATTO_AST_NODE_TYPE_SYNTAX_ERROR:
+                CATTO_LOG("[error]");
+                break;
+
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 if (currentAstNode->value.asStatement.attributes.asCommandHandler) {
                     CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
@@ -685,6 +715,14 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                     CATTO_LOG_CHAR(currentAstNode->value.asExpressionLeaf.value->type);
                 } else {
                     CATTO_LOG_CHAR('e');
+                }
+
+                if (currentAstNode->value.asExpressionLeaf.firstArgument) {
+                    CATTO_LOG_CHAR('(');
+
+                    catto_debugAstNodes(currentAstNode->value.asExpressionLeaf.firstArgument);
+
+                    CATTO_LOG_CHAR(')');
                 }
 
                 if (currentAstNode->value.asExpressionLeaf.index) {

@@ -82,8 +82,16 @@ typedef enum {
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
-    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP
+    CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
+    CATTO_ERROR_STATE_NOT_A_FUNCTION
 } catto_ErrorState;
+
+typedef enum {
+    CATTO_DATA_TYPE_NULL = '\0',
+    CATTO_DATA_TYPE_NUMBER = '%',
+    CATTO_DATA_TYPE_STRING = '$',
+    CATTO_DATA_TYPE_FUNCTION = 'f'
+} catto_DataType;
 
 typedef enum {
     CATTO_MARK_SEARCH_ALL,
@@ -109,6 +117,7 @@ typedef struct catto_Context {
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
+typedef struct catto_TypedValue (*catto_FunctionHandlerFunction)(catto_Context* context, catto_DataType returnType);
 
 typedef struct catto_CommandHandler {
     catto_Char* name;
@@ -145,17 +154,12 @@ typedef struct catto_Token {
     struct catto_Token* nextToken;
 } catto_Token;
 
-typedef enum {
-    CATTO_DATA_TYPE_NULL = '\0',
-    CATTO_DATA_TYPE_NUMBER = '%',
-    CATTO_DATA_TYPE_STRING = '$'
-} catto_DataType;
-
 typedef struct catto_TypedValue {
     catto_DataType type;
     union {
         catto_Float asNumber;
         catto_Char* asString;
+        catto_FunctionHandlerFunction asFunction;
     } value;
 } catto_TypedValue;
 
@@ -192,6 +196,7 @@ typedef struct catto_AstNode {
         struct {
             catto_TypedValue* value;
             catto_Char* subjectVariable;
+            struct catto_AstNode* firstArgument;
             struct catto_AstNode* index;
             catto_Bool appendFlag;
         } asExpressionLeaf;
@@ -493,6 +498,13 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     context->lastCommandHandler = commandHandler;
 }
 
+void catto_addFunction(catto_Context* context, catto_Char* name, catto_FunctionHandlerFunction function) {
+    catto_setVariable(context, name, (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_FUNCTION,
+        .value.asFunction = function
+    });
+}
+
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
     catto_Count i = 0;
 
@@ -575,24 +587,50 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         }
 
         catto_Char* subjectVariable = astNode->value.asExpressionLeaf.subjectVariable;
+        catto_AstNode* firstArgument = astNode->value.asExpressionLeaf.firstArgument;
 
         if (subjectVariable) {
             catto_Char* untypedSubjectVariable = catto_copyString(subjectVariable);
             catto_DataType type = catto_removeTypeFromVariableName(untypedSubjectVariable);
-            catto_TypedValue* variableValue = catto_getVariable(context, untypedSubjectVariable);
+            catto_TypedValue* variableValuePtr = catto_getVariable(context, untypedSubjectVariable);
 
             CATTO_FREE(untypedSubjectVariable);
 
-            if (variableValue) {
-                if (type == CATTO_DATA_TYPE_NULL) {
-                    return *variableValue;
+            if (variableValuePtr) {
+                catto_TypedValue variableValue = *variableValuePtr;
+
+                if (variableValue.type == CATTO_DATA_TYPE_FUNCTION) {
+                    catto_AstNode* stashedFirstParsedArgument = context->firstParsedArgument;
+                    catto_AstNode* stashedNextParsedArgument = context->nextParsedArgument;
+
+                    context->firstParsedArgument = firstArgument;
+                    context->nextParsedArgument = firstArgument;
+
+                    variableValue = variableValue.value.asFunction(context, type);
+
+                    context->firstParsedArgument = stashedFirstParsedArgument;
+                    context->nextParsedArgument = stashedNextParsedArgument;
+
+                    catto_addTypedValueToGc(context, variableValue);
+                } else if (firstArgument) {
+                    context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
+
+                    return DEFAULT_RETURN_VALUE;
                 }
 
-                catto_TypedValue castedValue = catto_castTypedValue(*variableValue, type);
+                if (type == CATTO_DATA_TYPE_NULL) {
+                    return variableValue;
+                }
+
+                catto_TypedValue castedValue = catto_castTypedValue(variableValue, type);
 
                 catto_addTypedValueToGc(context, castedValue);
 
                 return castedValue;
+            } else if (firstArgument) {
+                context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
+
+                return DEFAULT_RETURN_VALUE;
             }
         }
     }
@@ -1228,6 +1266,89 @@ void catto_command_stop(catto_Context* context) {
     context->nextParsedStatement = CATTO_NULL;
 }
 
+catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);
+
+    return catto_asTypedNumber((catto_Float)roundedValue);
+}
+
+catto_TypedValue catto_function_floor(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int flooredValue = (catto_Int)(value < 0 ? value - 1 : value);
+
+    return catto_asTypedNumber((catto_Float)flooredValue);
+}
+
+catto_TypedValue catto_function_ceil(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int flooredValue = (catto_Int)(value < 0 ? value - 1 : value);
+
+    return catto_asTypedNumber((catto_Float)(value == flooredValue ? flooredValue : flooredValue + 1));
+}
+
+catto_TypedValue catto_function_abs(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+
+    if (value < 0) {
+        value *= -1;
+    }
+
+    return catto_asTypedNumber(value);
+}
+
+catto_TypedValue catto_function_min(catto_Context* context, catto_DataType returnType) {
+    catto_Float a = catto_asNumber(catto_evalNextArg(context));
+    catto_Float b = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(b < a ? b : a);
+}
+
+catto_TypedValue catto_function_max(catto_Context* context, catto_DataType returnType) {
+    catto_Float a = catto_asNumber(catto_evalNextArg(context));
+    catto_Float b = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(b > a ? b : a);
+}
+
+catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Char* currentChar = value;
+
+    while (*currentChar != '\0') {
+        if (*currentChar >= 'A' && *currentChar <= 'Z') {
+            *currentChar += 'a' - 'A';
+        }
+
+        currentChar++;
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(value);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_upper(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Char* currentChar = value;
+
+    while (*currentChar != '\0') {
+        if (*currentChar >= 'a' && *currentChar <= 'z') {
+            *currentChar -= 'a' - 'A';
+        }
+
+        currentChar++;
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(value);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
@@ -1245,6 +1366,15 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "break", &catto_command_break);
     catto_addCommand(context, "continue", &catto_command_continue);
     catto_addCommand(context, "stop", &catto_command_stop);
+
+    catto_addFunction(context, "round", &catto_function_round);
+    catto_addFunction(context, "floor", &catto_function_floor);
+    catto_addFunction(context, "ceil", &catto_function_ceil);
+    catto_addFunction(context, "abs", &catto_function_abs);
+    catto_addFunction(context, "min", &catto_function_min);
+    catto_addFunction(context, "max", &catto_function_max);
+    catto_addFunction(context, "lower", &catto_function_lower);
+    catto_addFunction(context, "upper", &catto_function_upper);
 }
 
 // src/numbers.h
@@ -2188,6 +2318,7 @@ catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode*
 
     astNode->value.asExpressionLeaf.value = valuePtr;
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
+    astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
 
     return astNode;
@@ -2210,6 +2341,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 
     catto_TypedValue* value = CATTO_NULL;
     catto_Char* subjectVariable = CATTO_NULL;
+    catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* index = CATTO_NULL;
 
     switch (token->type) {
@@ -2232,6 +2364,28 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
         case CATTO_TOKEN_TYPE_IDENTIFIER:
             subjectVariable = catto_copyString(token->value.asString);
 
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_BRACKET)) {
+                catto_AstNode* currentArgument = CATTO_NULL;
+
+                while (CATTO_TRUE) {
+                    if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_BRACKET)) {
+                        break;
+                    }
+
+                    if (firstArgument && !catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
+                        return CATTO_NULL;
+                    }
+
+                    if (!catto_parseExpression(currentTokenPtr, &currentArgument)) {
+                        return CATTO_NULL;
+                    }
+
+                    if (!firstArgument) {
+                        firstArgument = currentArgument;
+                    }
+                }
+            }
+
             if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
                 if (!catto_parseExpression(currentTokenPtr, &index)) {
                     return CATTO_NULL;
@@ -2252,6 +2406,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
 
     astNode->value.asExpressionLeaf.value = value;
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
+    astNode->value.asExpressionLeaf.firstArgument = firstArgument;
     astNode->value.asExpressionLeaf.index = index;
     astNode->value.asExpressionLeaf.appendFlag = CATTO_FALSE;
 
@@ -2750,6 +2905,7 @@ void catto_freeAstNodes(catto_AstNode* firstAstNode) {
             case CATTO_AST_NODE_TYPE_EXPRESSION_LEAF:
                 catto_freeTypedValue(currentAstNode->value.asExpressionLeaf.value);
 
+                catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.firstArgument);
                 catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.index);
 
                 CATTO_FREE(currentAstNode->value.asExpressionLeaf.subjectVariable);
@@ -2790,6 +2946,10 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
         }
 
         switch (currentAstNode->type) {
+            case CATTO_AST_NODE_TYPE_SYNTAX_ERROR:
+                CATTO_LOG("[error]");
+                break;
+
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 if (currentAstNode->value.asStatement.attributes.asCommandHandler) {
                     CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);
@@ -2812,6 +2972,14 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                     CATTO_LOG_CHAR(currentAstNode->value.asExpressionLeaf.value->type);
                 } else {
                     CATTO_LOG_CHAR('e');
+                }
+
+                if (currentAstNode->value.asExpressionLeaf.firstArgument) {
+                    CATTO_LOG_CHAR('(');
+
+                    catto_debugAstNodes(currentAstNode->value.asExpressionLeaf.firstArgument);
+
+                    CATTO_LOG_CHAR(')');
                 }
 
                 if (currentAstNode->value.asExpressionLeaf.index) {

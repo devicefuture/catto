@@ -77,6 +77,13 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     context->lastCommandHandler = commandHandler;
 }
 
+void catto_addFunction(catto_Context* context, catto_Char* name, catto_FunctionHandlerFunction function) {
+    catto_setVariable(context, name, (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_FUNCTION,
+        .value.asFunction = function
+    });
+}
+
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
     catto_Count i = 0;
 
@@ -159,24 +166,50 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         }
 
         catto_Char* subjectVariable = astNode->value.asExpressionLeaf.subjectVariable;
+        catto_AstNode* firstArgument = astNode->value.asExpressionLeaf.firstArgument;
 
         if (subjectVariable) {
             catto_Char* untypedSubjectVariable = catto_copyString(subjectVariable);
             catto_DataType type = catto_removeTypeFromVariableName(untypedSubjectVariable);
-            catto_TypedValue* variableValue = catto_getVariable(context, untypedSubjectVariable);
+            catto_TypedValue* variableValuePtr = catto_getVariable(context, untypedSubjectVariable);
 
             CATTO_FREE(untypedSubjectVariable);
 
-            if (variableValue) {
-                if (type == CATTO_DATA_TYPE_NULL) {
-                    return *variableValue;
+            if (variableValuePtr) {
+                catto_TypedValue variableValue = *variableValuePtr;
+
+                if (variableValue.type == CATTO_DATA_TYPE_FUNCTION) {
+                    catto_AstNode* stashedFirstParsedArgument = context->firstParsedArgument;
+                    catto_AstNode* stashedNextParsedArgument = context->nextParsedArgument;
+
+                    context->firstParsedArgument = firstArgument;
+                    context->nextParsedArgument = firstArgument;
+
+                    variableValue = variableValue.value.asFunction(context, type);
+
+                    context->firstParsedArgument = stashedFirstParsedArgument;
+                    context->nextParsedArgument = stashedNextParsedArgument;
+
+                    catto_addTypedValueToGc(context, variableValue);
+                } else if (firstArgument) {
+                    context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
+
+                    return DEFAULT_RETURN_VALUE;
                 }
 
-                catto_TypedValue castedValue = catto_castTypedValue(*variableValue, type);
+                if (type == CATTO_DATA_TYPE_NULL) {
+                    return variableValue;
+                }
+
+                catto_TypedValue castedValue = catto_castTypedValue(variableValue, type);
 
                 catto_addTypedValueToGc(context, castedValue);
 
                 return castedValue;
+            } else if (firstArgument) {
+                context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
+
+                return DEFAULT_RETURN_VALUE;
             }
         }
     }
@@ -812,6 +845,89 @@ void catto_command_stop(catto_Context* context) {
     context->nextParsedStatement = CATTO_NULL;
 }
 
+catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);
+
+    return catto_asTypedNumber((catto_Float)roundedValue);
+}
+
+catto_TypedValue catto_function_floor(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int flooredValue = (catto_Int)(value < 0 ? value - 1 : value);
+
+    return catto_asTypedNumber((catto_Float)flooredValue);
+}
+
+catto_TypedValue catto_function_ceil(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+    catto_Int flooredValue = (catto_Int)(value < 0 ? value - 1 : value);
+
+    return catto_asTypedNumber((catto_Float)(value == flooredValue ? flooredValue : flooredValue + 1));
+}
+
+catto_TypedValue catto_function_abs(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+
+    if (value < 0) {
+        value *= -1;
+    }
+
+    return catto_asTypedNumber(value);
+}
+
+catto_TypedValue catto_function_min(catto_Context* context, catto_DataType returnType) {
+    catto_Float a = catto_asNumber(catto_evalNextArg(context));
+    catto_Float b = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(b < a ? b : a);
+}
+
+catto_TypedValue catto_function_max(catto_Context* context, catto_DataType returnType) {
+    catto_Float a = catto_asNumber(catto_evalNextArg(context));
+    catto_Float b = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(b > a ? b : a);
+}
+
+catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Char* currentChar = value;
+
+    while (*currentChar != '\0') {
+        if (*currentChar >= 'A' && *currentChar <= 'Z') {
+            *currentChar += 'a' - 'A';
+        }
+
+        currentChar++;
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(value);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_upper(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Char* currentChar = value;
+
+    while (*currentChar != '\0') {
+        if (*currentChar >= 'a' && *currentChar <= 'z') {
+            *currentChar -= 'a' - 'A';
+        }
+
+        currentChar++;
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(value);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
 void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "print", &catto_command_print);
     catto_addCommand(context, "goto", &catto_command_goto);
@@ -829,4 +945,13 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "break", &catto_command_break);
     catto_addCommand(context, "continue", &catto_command_continue);
     catto_addCommand(context, "stop", &catto_command_stop);
+
+    catto_addFunction(context, "round", &catto_function_round);
+    catto_addFunction(context, "floor", &catto_function_floor);
+    catto_addFunction(context, "ceil", &catto_function_ceil);
+    catto_addFunction(context, "abs", &catto_function_abs);
+    catto_addFunction(context, "min", &catto_function_min);
+    catto_addFunction(context, "max", &catto_function_max);
+    catto_addFunction(context, "lower", &catto_function_lower);
+    catto_addFunction(context, "upper", &catto_function_upper);
 }
