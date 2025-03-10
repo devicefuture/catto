@@ -845,6 +845,55 @@ void catto_command_stop(catto_Context* context) {
     context->nextParsedStatement = CATTO_NULL;
 }
 
+void catto_command_dim(catto_Context* context) {
+    catto_AstNode* identifier = catto_getNextArg(context);
+
+    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    catto_TypedValue listValue = {
+        .type = CATTO_DATA_TYPE_LIST,
+        .value.asList = catto_newList()
+    };
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);
+}
+
+void catto_command_push(catto_Context* context) {
+    catto_TypedValue value = catto_evalNextArg(context);
+    catto_TypedValue listValue = catto_evalNextArg(context);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+        return;
+    }
+
+    catto_pushOntoList(listValue.value.asList, value);
+}
+
+void catto_command_pop(catto_Context* context) {
+    catto_TypedValue listValue = catto_evalNextArg(context);
+    catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    catto_TypedValue poppedValue = catto_popFromList(context, listValue.value.asList);
+
+    if (reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        catto_setVariable(context, reassignedIdentifier->value.asExpressionLeaf.subjectVariable, poppedValue);
+    }
+}
+
 catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
     catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);
@@ -945,6 +994,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "break", &catto_command_break);
     catto_addCommand(context, "continue", &catto_command_continue);
     catto_addCommand(context, "stop", &catto_command_stop);
+    catto_addCommand(context, "dim", &catto_command_dim);
+    catto_addCommand(context, "push", &catto_command_push);
+    catto_addCommand(context, "pop", &catto_command_pop);
 
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);

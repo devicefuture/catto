@@ -31,6 +31,7 @@ include src/operators.h
 include src/contexts.h
 include src/numbers.h
 include src/strings.h
+include src/lists.h
 include src/datatypes.h
 include src/tokeniser.h
 include src/parser.h

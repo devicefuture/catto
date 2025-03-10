@@ -1,18 +1,21 @@
 typedef enum {
-    CATTO_ERROR_STATE_NONE,
+    CATTO_ERROR_STATE_NONE = 0,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
-    CATTO_ERROR_STATE_NOT_A_FUNCTION
+    CATTO_ERROR_STATE_NOT_A_FUNCTION,
+    CATTO_ERROR_STATE_NOT_A_LIST,
+    CATTO_ERROR_STATE_INVALID_LIST_VALUE
 } catto_ErrorState;
 
 typedef enum {
     CATTO_DATA_TYPE_NULL = '\0',
     CATTO_DATA_TYPE_NUMBER = '%',
     CATTO_DATA_TYPE_STRING = '$',
-    CATTO_DATA_TYPE_FUNCTION = 'f'
+    CATTO_DATA_TYPE_FUNCTION = 'f',
+    CATTO_DATA_TYPE_LIST = 'l'
 } catto_DataType;
 
 typedef enum {
@@ -76,11 +79,18 @@ typedef struct catto_Token {
     struct catto_Token* nextToken;
 } catto_Token;
 
+typedef struct catto_List {
+    struct catto_TypedValue* values;
+    catto_Count length;
+    catto_Count referenceCount;
+} catto_List;
+
 typedef struct catto_TypedValue {
     catto_DataType type;
     union {
         catto_Float asNumber;
         catto_Char* asString;
+        catto_List* asList;
         catto_FunctionHandlerFunction asFunction;
     } value;
 } catto_TypedValue;
@@ -177,6 +187,12 @@ catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
+
+catto_List* catto_newList();
+catto_List* catto_referenceList(catto_List* list);
+void catto_destroyList(catto_Context* context, catto_List* list);
+void catto_pushOntoList(catto_List* list, catto_TypedValue value);
+catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 
 catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);

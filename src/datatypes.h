@@ -67,6 +67,10 @@ catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
         value.value.asString = catto_copyString(value.value.asString);
     }
 
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        catto_referenceList(value.value.asList);
+    }
+
     return value;
 }
 
@@ -91,6 +95,10 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
         catto_addPointerToGc(context, value.value.asString);
+    }
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        catto_destroyList(context, value.value.asList);
     }
 }
 

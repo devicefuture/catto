@@ -77,20 +77,23 @@ typedef CATTO_FLOAT catto_Float;
 // src/declarations.h
 
 typedef enum {
-    CATTO_ERROR_STATE_NONE,
+    CATTO_ERROR_STATE_NONE = 0,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
-    CATTO_ERROR_STATE_NOT_A_FUNCTION
+    CATTO_ERROR_STATE_NOT_A_FUNCTION,
+    CATTO_ERROR_STATE_NOT_A_LIST,
+    CATTO_ERROR_STATE_INVALID_LIST_VALUE
 } catto_ErrorState;
 
 typedef enum {
     CATTO_DATA_TYPE_NULL = '\0',
     CATTO_DATA_TYPE_NUMBER = '%',
     CATTO_DATA_TYPE_STRING = '$',
-    CATTO_DATA_TYPE_FUNCTION = 'f'
+    CATTO_DATA_TYPE_FUNCTION = 'f',
+    CATTO_DATA_TYPE_LIST = 'l'
 } catto_DataType;
 
 typedef enum {
@@ -154,11 +157,18 @@ typedef struct catto_Token {
     struct catto_Token* nextToken;
 } catto_Token;
 
+typedef struct catto_List {
+    struct catto_TypedValue* values;
+    catto_Count length;
+    catto_Count referenceCount;
+} catto_List;
+
 typedef struct catto_TypedValue {
     catto_DataType type;
     union {
         catto_Float asNumber;
         catto_Char* asString;
+        catto_List* asList;
         catto_FunctionHandlerFunction asFunction;
     } value;
 } catto_TypedValue;
@@ -255,6 +265,12 @@ catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
 catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
+
+catto_List* catto_newList();
+catto_List* catto_referenceList(catto_List* list);
+void catto_destroyList(catto_Context* context, catto_List* list);
+void catto_pushOntoList(catto_List* list, catto_TypedValue value);
+catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 
 catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
@@ -1266,6 +1282,55 @@ void catto_command_stop(catto_Context* context) {
     context->nextParsedStatement = CATTO_NULL;
 }
 
+void catto_command_dim(catto_Context* context) {
+    catto_AstNode* identifier = catto_getNextArg(context);
+
+    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    catto_TypedValue listValue = {
+        .type = CATTO_DATA_TYPE_LIST,
+        .value.asList = catto_newList()
+    };
+
+    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);
+}
+
+void catto_command_push(catto_Context* context) {
+    catto_TypedValue value = catto_evalNextArg(context);
+    catto_TypedValue listValue = catto_evalNextArg(context);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+        return;
+    }
+
+    catto_pushOntoList(listValue.value.asList, value);
+}
+
+void catto_command_pop(catto_Context* context) {
+    catto_TypedValue listValue = catto_evalNextArg(context);
+    catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    catto_TypedValue poppedValue = catto_popFromList(context, listValue.value.asList);
+
+    if (reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        catto_setVariable(context, reassignedIdentifier->value.asExpressionLeaf.subjectVariable, poppedValue);
+    }
+}
+
 catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
     catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);
@@ -1366,6 +1431,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "break", &catto_command_break);
     catto_addCommand(context, "continue", &catto_command_continue);
     catto_addCommand(context, "stop", &catto_command_stop);
+    catto_addCommand(context, "dim", &catto_command_dim);
+    catto_addCommand(context, "push", &catto_command_push);
+    catto_addCommand(context, "pop", &catto_command_pop);
 
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
@@ -1790,6 +1858,55 @@ catto_Float catto_stringToNumber(catto_Char* string, catto_Count* charactersEate
 
 #endif
 
+// src/lists.h
+
+catto_List* catto_newList() {
+    catto_List* list = CATTO_NEW(catto_List);
+
+    list->values = CATTO_MALLOC(0);
+    list->length = 0;
+    list->referenceCount = 0;
+
+    return list;
+}
+
+catto_List* catto_referenceList(catto_List* list) {
+    list->referenceCount++;
+
+    return list;
+}
+
+void catto_destroyList(catto_Context* context, catto_List* list) {
+    if (list->referenceCount > 0) {
+        list->referenceCount--;
+    }
+
+    if (list->referenceCount == 0) {
+        for (catto_Count i = 0; i < list->length; i++) {
+            catto_addTypedValueToGc(context, list->values[i]);
+        }
+    }
+}
+
+void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
+    list->values = CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values[list->length - 1] = catto_copyTypedValue(value);
+}
+
+catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list) {
+    if (list->length == 0) {
+        return catto_asTypedNumber(0);
+    }
+
+    catto_TypedValue value = list->values[--list->length];
+
+    list->values = CATTO_REALLOC(list->values, list->length * sizeof(catto_TypedValue));
+
+    catto_addTypedValueToGc(context, value);
+
+    return value;
+}
+
 // src/datatypes.h
 
 catto_Float catto_asNumber(catto_TypedValue value) {
@@ -1861,6 +1978,10 @@ catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
         value.value.asString = catto_copyString(value.value.asString);
     }
 
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        catto_referenceList(value.value.asList);
+    }
+
     return value;
 }
 
@@ -1885,6 +2006,10 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
         catto_addPointerToGc(context, value.value.asString);
+    }
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        catto_destroyList(context, value.value.asList);
     }
 }
 
