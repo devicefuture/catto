@@ -23,6 +23,9 @@ void catto_destroyList(catto_Context* context, catto_List* list) {
         for (catto_Count i = 0; i < list->length; i++) {
             catto_addTypedValueToGc(context, list->values[i]);
         }
+
+        CATTO_FREE(list->values);
+        CATTO_FREE(list);
     }
 }
 
@@ -48,6 +51,7 @@ catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list) {
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index) {
     if (index >= list->length) {
         catto_pushOntoList(list, value);
+
         return;
     }
 
@@ -76,6 +80,30 @@ catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, 
     catto_addTypedValueToGc(context, value);
 
     return value;
+}
+
+catto_TypedValue catto_getListItem(catto_List* list, catto_Count index) {
+    if (index >= list->length) {
+        return catto_asTypedNumber(0);
+    }
+
+    return list->values[index];
+}
+
+void catto_setListItem(catto_Context* context, catto_List* list, catto_Count index, catto_TypedValue value) {
+    if (index >= list->length) {
+        while (index > 0 && list->length < index) {
+            catto_pushOntoList(list, catto_asTypedNumber(0));
+        }
+
+        catto_pushOntoList(list, value);
+
+        return;
+    }
+
+    catto_addTypedValueToGc(context, list->values[index]);
+
+    list->values[index] = value;
 }
 
 catto_Char* catto_listToString(catto_List* list) {

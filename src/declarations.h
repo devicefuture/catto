@@ -7,7 +7,8 @@ typedef enum {
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
-    CATTO_ERROR_STATE_INVALID_LIST_VALUE
+    CATTO_ERROR_STATE_INVALID_LIST_VALUE,
+    CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE
 } catto_ErrorState;
 
 typedef enum {
@@ -162,6 +163,7 @@ void catto_addContextStandardCommands(catto_Context* context);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
 void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
+void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_AstNode* catto_getNextArg(catto_Context* context);
@@ -195,6 +197,8 @@ void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
 catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
+catto_TypedValue catto_getListItem(catto_List* list, catto_Count index);
+void catto_setListItem(catto_Context* context, catto_List* list, catto_Count index, catto_TypedValue value);
 catto_Char* catto_listToString(catto_List* list);
 
 catto_Float catto_asNumber(catto_TypedValue value);
