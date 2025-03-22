@@ -193,6 +193,9 @@ catto_List* catto_referenceList(catto_List* list);
 void catto_destroyList(catto_Context* context, catto_List* list);
 void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
+void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
+catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
+catto_Char* catto_listToString(catto_List* list);
 
 catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);

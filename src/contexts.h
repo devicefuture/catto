@@ -889,8 +889,51 @@ void catto_command_pop(catto_Context* context) {
 
     catto_TypedValue poppedValue = catto_popFromList(context, listValue.value.asList);
 
-    if (reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+    if (reassignedIdentifier && reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
         catto_setVariable(context, reassignedIdentifier->value.asExpressionLeaf.subjectVariable, poppedValue);
+    }
+}
+
+void catto_command_insert(catto_Context* context) {
+    catto_TypedValue value = catto_evalNextArg(context);
+    catto_TypedValue listValue = catto_evalNextArg(context);
+    catto_Int index = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+        return;
+    }
+
+    while (index < 0) {
+        index += listValue.value.asList->length;
+    }
+
+    catto_insertIntoList(listValue.value.asList, value, index);
+}
+
+void catto_command_remove(catto_Context* context) {
+    catto_TypedValue listValue = catto_evalNextArg(context);
+    catto_Int index = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+    catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    while (index < 0) {
+        index += listValue.value.asList->length;
+    }
+
+    catto_TypedValue removedValue = catto_removeFromList(context, listValue.value.asList, index);
+
+    if (reassignedIdentifier && reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        catto_setVariable(context, reassignedIdentifier->value.asExpressionLeaf.subjectVariable, removedValue);
     }
 }
 
@@ -997,6 +1040,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "dim", &catto_command_dim);
     catto_addCommand(context, "push", &catto_command_push);
     catto_addCommand(context, "pop", &catto_command_pop);
+    catto_addCommand(context, "insert", &catto_command_insert);
+    catto_addCommand(context, "remove", &catto_command_remove);
 
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);

@@ -28,6 +28,10 @@ catto_Char* catto_asString(catto_TypedValue value) {
         return catto_copyString(value.value.asString);
     }
 
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        return catto_listToString(value.value.asList);
+    }
+
     return catto_copyString("");
 }
 
