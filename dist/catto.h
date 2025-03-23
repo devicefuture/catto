@@ -591,6 +591,12 @@ void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValu
 }
 
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value) {
+    if (!astNode) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
+
+        return;
+    }
+
     if (astNode->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
         context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
 
@@ -2385,7 +2391,7 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
             return CATTO_NULL;
         }
 
-        if (currentChar == '\'') {
+        if (currentChar == '\\') {
             switch (code[index]) {
                 case '\0':
                 case '\n':

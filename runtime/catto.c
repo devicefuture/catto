@@ -11,6 +11,7 @@
 
 // #define DEBUG_MEMORY
 
+bool inRepl = false;
 bool interrupted = false;
 
 typedef struct Line {
@@ -62,6 +63,8 @@ bool readLine(char** line) {
         }
 
         if (c == '\e') { // Escape
+            interrupted = true;
+
             putc('\n', stdout);
 
             return false;
@@ -116,22 +119,26 @@ void runCode(catto_Context* context, char* code) {
         case CATTO_ERROR_STATE_NOT_A_FUNCTION: message = "Attempt to call variable that is not a function"; break;
         case CATTO_ERROR_STATE_NOT_A_LIST: message = "Cannot perform list operation on non-list variable"; break;
         case CATTO_ERROR_STATE_INVALID_LIST_VALUE: message = "Invalid list value"; break;
-        case CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE: message = "Cannot assign value to non-variable"; break;
+        case CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE: message = "Expected variable name"; break;
 
         default: break;
     }
 
     if (context->errorState != CATTO_ERROR_STATE_NONE) {
         if (context->subjectLineNumber > 0) {
-            printf("%s at line %d\n", message, context->subjectLineNumber);
+            fprintf(stderr, "%s at line %d\n", message, context->subjectLineNumber);
         } else {
-            printf("%s\n", message);
+            fprintf(stderr, "%s\n", message);
         }
     }
 
     free(code);
 
-    printf(interrupted ? "Interrupt\n" : "Ready\n");
+    if (interrupted) {
+        printf("Interrupt\n");
+    } else if (inRepl) {
+        printf("Ready\n");
+    }
 }
 
 void inputCommand(catto_Context* context) {
@@ -142,11 +149,6 @@ void inputCommand(catto_Context* context) {
     free(string);
 
     catto_AstNode* identifier = catto_getNextArg(context);
-
-    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
-        return;
-    }
 
     char* line = CATTO_NULL;
     bool finished = readLine(&line);
@@ -161,7 +163,7 @@ void inputCommand(catto_Context* context) {
         .value.asString = line
     };
 
-    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, value);
+    catto_assignValue(context, identifier, value);
 
     free(line);
 }
@@ -179,13 +181,46 @@ int main(int argc, char* argv[]) {
 
     fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
 
-    printf("Welcome to catto\n");
-    printf("Ready\n");
-
     catto_Context* context = catto_newContext();
 
     catto_addContextStandardCommands(context);
     catto_addCommand(context, "input", &inputCommand);
+
+    if (argc >= 2) {
+        FILE* fp = fopen(argv[1], "r");
+
+        if (!fp) {
+            fprintf(stderr, "Error when reading file\n");
+
+            return 1;
+        }
+
+        fseek(fp, 0, SEEK_END);
+
+        unsigned int size = ftell(fp);
+        char* code = (char*)malloc(size + 1);
+
+        fseek(fp, 0, SEEK_SET);
+
+        if (fread(code, sizeof(char), size, fp) != size) {
+            fprintf(stderr, "Error reading file contents\n");
+
+            return 1;
+        }
+
+        code[size] = '\0';
+
+        runCode(context, code);
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
+
+        return context->errorState == CATTO_ERROR_STATE_NONE ? 0 : 1;
+    }
+
+    inRepl = true;
+
+    printf("Welcome to catto\n");
+    printf("Ready\n");
 
     char* lineString = NULL;
 

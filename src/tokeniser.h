@@ -145,7 +145,7 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
             return CATTO_NULL;
         }
 
-        if (currentChar == '\'') {
+        if (currentChar == '\\') {
             switch (code[index]) {
                 case '\0':
                 case '\n':
