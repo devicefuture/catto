@@ -10,13 +10,23 @@
 
 #include <stdint.h>
 
-#define CATTO_BOOL int
-#define CATTO_COUNT unsigned int
-#define CATTO_CHAR char
-#define CATTO_INT int
-#define CATTO_FLOAT float
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_BOOL long
+    #define CATTO_COUNT unsigned long
+    #define CATTO_CHAR char
+    #define CATTO_INT long
+    #define CATTO_FLOAT double
 
-#define CATTO_MAX_PRECISION 6
+    #define CATTO_MAX_PRECISION 15
+#else
+    #define CATTO_BOOL int
+    #define CATTO_COUNT unsigned int
+    #define CATTO_CHAR char
+    #define CATTO_INT int
+    #define CATTO_FLOAT float
+
+    #define CATTO_MAX_PRECISION 6
+#endif
 
 #endif
 
@@ -999,29 +1009,31 @@ void catto_run(catto_Context* context) {
     while (catto_step(context)) {}
 }
 
-void catto_command_print(catto_Context* context) {
-    catto_Bool appendFlag = CATTO_FALSE;
+#ifndef CATTO_CUSTOM_PRINT_COMMAND
+    void catto_command_print(catto_Context* context) {
+        catto_Bool appendFlag = CATTO_FALSE;
 
-    while (catto_hasNextArg(context)) {
-        catto_AstNode* arg = catto_getNextArg(context);
-        catto_Char* string = catto_asString(catto_evalExpression(context, arg));
+        while (catto_hasNextArg(context)) {
+            catto_AstNode* arg = catto_getNextArg(context);
+            catto_Char* string = catto_asString(catto_evalExpression(context, arg));
 
-        if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
-            appendFlag = CATTO_TRUE;
+            if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
+                appendFlag = CATTO_TRUE;
+            }
+
+            CATTO_LOG(string);
+            CATTO_FREE(string);
+
+            if (catto_hasNextArg(context)) {
+                CATTO_LOG(" ");
+            }
         }
 
-        CATTO_LOG(string);
-        CATTO_FREE(string);
-
-        if (catto_hasNextArg(context)) {
-            CATTO_LOG(" ");
+        if (!appendFlag) {
+            CATTO_LOG("\n");
         }
     }
-
-    if (!appendFlag) {
-        CATTO_LOG("\n");
-    }
-}
+#endif
 
 void catto_command_goto(catto_Context* context) {
     catto_Int lineNumber = (catto_Int)catto_asNumber(catto_evalNextArg(context));
@@ -1551,7 +1563,10 @@ catto_TypedValue catto_function_upper(catto_Context* context, catto_DataType ret
 }
 
 void catto_addContextStandardCommands(catto_Context* context) {
-    catto_addCommand(context, "print", &catto_command_print);
+    #ifndef CATTO_CUSTOM_PRINT_COMMAND
+        catto_addCommand(context, "print", &catto_command_print);
+    #endif
+
     catto_addCommand(context, "goto", &catto_command_goto);
     catto_addCommand(context, "gosub", &catto_command_gosub);
     catto_addCommand(context, "return", &catto_command_return);

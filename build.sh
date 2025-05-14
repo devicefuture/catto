@@ -43,5 +43,5 @@ EOF
 mkdir -p runtime/build
 mkdir -p examples/build
 
-$CC -Idist/ runtime/catto.c -o runtime/build/catto
+$CC -Idist/ -DCATTO_USE_64_BIT runtime/catto.c -o runtime/build/catto
 $CC -Idist/ examples/hello.c -o examples/build/hello

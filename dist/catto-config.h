@@ -5,13 +5,23 @@
 
 #include <stdint.h>
 
-#define CATTO_BOOL int
-#define CATTO_COUNT unsigned int
-#define CATTO_CHAR char
-#define CATTO_INT int
-#define CATTO_FLOAT float
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_BOOL long
+    #define CATTO_COUNT unsigned long
+    #define CATTO_CHAR char
+    #define CATTO_INT long
+    #define CATTO_FLOAT double
 
-#define CATTO_MAX_PRECISION 6
+    #define CATTO_MAX_PRECISION 15
+#else
+    #define CATTO_BOOL int
+    #define CATTO_COUNT unsigned int
+    #define CATTO_CHAR char
+    #define CATTO_INT int
+    #define CATTO_FLOAT float
+
+    #define CATTO_MAX_PRECISION 6
+#endif
 
 #endif
 
