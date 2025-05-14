@@ -11,18 +11,18 @@
 #include <stdint.h>
 
 #ifdef CATTO_USE_64_BIT
-    #define CATTO_BOOL long
-    #define CATTO_COUNT unsigned long
+    #define CATTO_BOOL int64_t
+    #define CATTO_COUNT uint64_t
     #define CATTO_CHAR char
-    #define CATTO_INT long
+    #define CATTO_INT int64_t
     #define CATTO_FLOAT double
 
     #define CATTO_MAX_PRECISION 15
 #else
-    #define CATTO_BOOL int
-    #define CATTO_COUNT unsigned int
+    #define CATTO_BOOL int32_t
+    #define CATTO_COUNT uint32_t
     #define CATTO_CHAR char
-    #define CATTO_INT int
+    #define CATTO_INT uint32_t
     #define CATTO_FLOAT float
 
     #define CATTO_MAX_PRECISION 6
