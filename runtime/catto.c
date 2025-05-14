@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <sys/time.h>
 #include <catto-config.h>
 #include <catto.h>
 
@@ -168,6 +169,16 @@ void inputCommand(catto_Context* context) {
     free(line);
 }
 
+catto_TypedValue epochFunction(catto_Context* context, catto_DataType returnType) {
+    struct timeval time;
+
+    gettimeofday(&time, NULL);
+
+    uint64_t epoch = (uint64_t)(time.tv_sec * 1000) + (uint64_t)(time.tv_usec / 1000);
+
+    return catto_asTypedNumber(epoch);
+}
+
 int main(int argc, char* argv[]) {
     struct termios attributes;
     struct termios originalAttributes;
@@ -185,6 +196,7 @@ int main(int argc, char* argv[]) {
 
     catto_addContextStandardCommands(context);
     catto_addCommand(context, "input", &inputCommand);
+    catto_addFunction(context, "epoch", &epochFunction);
 
     if (argc >= 2) {
         FILE* fp = fopen(argv[1], "r");
