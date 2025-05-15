@@ -35,6 +35,11 @@ include src/lists.h
 include src/datatypes.h
 include src/tokeniser.h
 include src/parser.h
+include src/stdlib/controlflow.h
+include src/stdlib/io.h
+include src/stdlib/lists.h
+include src/stdlib/functions.h
+include src/stdlib/stdlib.h
 
 tee -a dist/catto.h > /dev/null << EOF
 #endif
