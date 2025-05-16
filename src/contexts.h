@@ -11,10 +11,10 @@ catto_Context* catto_newContext() {
     context->firstParsedArgument = CATTO_NULL;
     context->nextParsedArgument = CATTO_NULL;
 
-    context->statementStack = CATTO_MALLOC(0);
+    context->statementStack = (catto_AstNode**)CATTO_MALLOC(0);
     context->statementStackCount = 0;
 
-    context->pointersToGc = CATTO_MALLOC(0);
+    context->pointersToGc = (void**)CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
 
     context->errorState = CATTO_ERROR_STATE_NONE;
@@ -26,7 +26,7 @@ catto_Context* catto_newContext() {
 void catto_addPointerToGc(catto_Context* context, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 
-    context->pointersToGc = CATTO_REALLOC(context->pointersToGc, sizeof(void*) * context->pointersToGcCount + 1);
+    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * context->pointersToGcCount + 1);
     context->pointersToGc[context->pointersToGcCount++] = ptr;
 }
 
@@ -55,11 +55,11 @@ void catto_gc(catto_Context* context) {
         }
     }
 
-    context->pointersToGc = CATTO_REALLOC(context->pointersToGc, 0);
+    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, 0);
     context->pointersToGcCount = 0;
 }
 
-void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function) {
+void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function) {
     catto_CommandHandler* commandHandler = CATTO_NEW(catto_CommandHandler);
 
     commandHandler->name = name;
@@ -77,10 +77,10 @@ void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHan
     context->lastCommandHandler = commandHandler;
 }
 
-void catto_addFunction(catto_Context* context, catto_Char* name, catto_FunctionHandlerFunction function) {
+void catto_addFunction(catto_Context* context, const catto_Char* name, catto_FunctionHandlerFunction function) {
     catto_setVariable(context, name, (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_FUNCTION,
-        .value.asFunction = function
+        .value = {.asFunction = function}
     });
 }
 
@@ -89,7 +89,7 @@ catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
 
     while (name[i]) {
         if (name[i] == '$' || name[i] == '%') {
-            catto_DataType type = name[i];
+            catto_DataType type = (catto_DataType)name[i];
 
             name[i] = CATTO_NULL;
 
@@ -99,7 +99,7 @@ catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
         i++;
     }
 
-    return '\0';
+    return CATTO_DATA_TYPE_NULL;
 }
 
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
@@ -116,9 +116,9 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     return CATTO_NULL;
 }
 
-void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value) {
+void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value) {
     catto_Char* untypedName = catto_copyString(name);
-    catto_DataType type = catto_removeTypeFromVariableName(untypedName);
+    catto_DataType type = (catto_DataType)catto_removeTypeFromVariableName(untypedName);
     catto_TypedValue* existingVariableValue = catto_getVariable(context, untypedName);
 
     if (existingVariableValue) {
@@ -198,7 +198,7 @@ catto_Bool catto_hasNextArg(catto_Context* context) {
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode) {
     const catto_TypedValue DEFAULT_RETURN_VALUE = (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_NUMBER,
-        .value.asNumber = 0
+        .value = {.asNumber = 0}
     };
 
     if (!astNode) {
@@ -215,7 +215,7 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
 
         if (subjectVariable) {
             catto_Char* untypedSubjectVariable = catto_copyString(subjectVariable);
-            catto_DataType type = catto_removeTypeFromVariableName(untypedSubjectVariable);
+            catto_DataType type = (catto_DataType)catto_removeTypeFromVariableName(untypedSubjectVariable);
             catto_TypedValue* variableValuePtr = catto_getVariable(context, untypedSubjectVariable);
 
             CATTO_FREE(untypedSubjectVariable);
@@ -277,13 +277,13 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
     }
 
     if (astNode->type == CATTO_AST_NODE_TYPE_UNARY_EXPRESSION) {
-        catto_Char* operator = astNode->value.asUnaryExpression.operator;
+        catto_Char* operatorValue = astNode->value.asUnaryExpression.operatorValue;
         catto_Count i = 0;
 
-        while (catto_operatorMappings[i].operator) {
+        while (catto_operatorMappings[i].operatorValue) {
             catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[i];
 
-            if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
+            if (catto_stringsEqualCaseInsensitive(operatorValue, currentOperatorMapping.operatorValue)) {
                 catto_UnaryOperatorFunction function = currentOperatorMapping.unaryFunction;
 
                 if (function) {
@@ -305,14 +305,14 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
         currentChild = currentChild->nextAstNode;
 
         while (currentChild) {
-            catto_Char* operator = astNode->value.asBinaryExpression.operators[i++];
+            catto_Char* operatorValue = astNode->value.asBinaryExpression.operatorValues[i++];
             catto_Bool foundOperatorMapping = CATTO_FALSE;
             catto_Count j = 0;
 
-            while (catto_operatorMappings[j].operator) {
+            while (catto_operatorMappings[j].operatorValue) {
                 catto_OperatorMapping currentOperatorMapping = catto_operatorMappings[j];
 
-                if (catto_stringsEqualCaseInsensitive(operator, currentOperatorMapping.operator)) {
+                if (catto_stringsEqualCaseInsensitive(operatorValue, currentOperatorMapping.operatorValue)) {
                     catto_BinaryOperatorFunction function = currentOperatorMapping.binaryFunction;
 
                     if (function) {
@@ -466,7 +466,7 @@ void catto_goto(catto_Context* context, catto_Count lineNumber) {
 }
 
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement) {
-    context->statementStack = CATTO_REALLOC(context->statementStack, context->statementStackCount + 1);
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, context->statementStackCount + 1);
 
     context->statementStack[context->statementStackCount++] = statement;
 }
@@ -478,7 +478,7 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
 
     catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
 
-    context->statementStack = CATTO_REALLOC(context->statementStack, --context->statementStackCount);
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, --context->statementStackCount);
 
     return lastStatement;
 }
@@ -545,7 +545,7 @@ void catto_load(catto_Context* context, const catto_Char* code) {
     context->subjectLineNumber = 0;
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
-    context->statementStack = CATTO_REALLOC(context->statementStack, 0);
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, 0);
     context->statementStackCount = 0;
 
     catto_freeTokens(firstToken);

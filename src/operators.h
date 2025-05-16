@@ -1,4 +1,4 @@
-catto_Char* catto_operators[] = {
+const catto_Char* catto_operators[] = {
     "+", "-", "*", "/", "div", "mod", "^",
     "&", "|", "~", "¬",
     "<<", ">>",
@@ -8,19 +8,19 @@ catto_Char* catto_operators[] = {
     CATTO_NULL
 };
 
-catto_Char** catto_operatorPrecedence[] = {
-    (catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
-    (catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
-    (catto_Char*[]) {";", CATTO_NULL},
-    (catto_Char*[]) {"<<", ">>", CATTO_NULL},
-    (catto_Char*[]) {"+", "-", CATTO_NULL},
-    (catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
-    (catto_Char*[]) {"^", CATTO_NULL},
-    (catto_Char*[]) {"&", "|", "~", CATTO_NULL},
+const catto_Char** catto_operatorPrecedence[] = {
+    (const catto_Char*[]) {"and", "or", "xor", CATTO_NULL},
+    (const catto_Char*[]) {"!=", "<=", ">=", "=", "<", ">", CATTO_NULL},
+    (const catto_Char*[]) {";", CATTO_NULL},
+    (const catto_Char*[]) {"<<", ">>", CATTO_NULL},
+    (const catto_Char*[]) {"+", "-", CATTO_NULL},
+    (const catto_Char*[]) {"*", "/", "div", "mod", CATTO_NULL},
+    (const catto_Char*[]) {"^", CATTO_NULL},
+    (const catto_Char*[]) {"&", "|", "~", CATTO_NULL},
     CATTO_NULL
 };
 
-catto_Char* catto_unaryOperators[] = {
+const catto_Char* catto_unaryOperators[] = {
     "+",
     "-",
     "¬",
@@ -96,7 +96,7 @@ catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a,
 
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
-        .value.asString = resultString
+        .value = {.asString = resultString}
     };
 }
 

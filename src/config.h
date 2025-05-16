@@ -25,6 +25,14 @@
 
 #endif
 
+#ifndef CATTO_FN_PREFIX
+    #ifdef __cplusplus
+        #define CATTO_FN_PREFIX inline
+    #else
+        #define CATTO_FN_PREFIX
+    #endif
+#endif
+
 #define CATTO_USE_STDLIB
 
 #ifdef CATTO_USE_STDLIB
@@ -32,7 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void _catto_log(char* text) {
+void _catto_log(const char* text) {
     printf("%s", text);
 }
 

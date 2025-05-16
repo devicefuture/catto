@@ -45,6 +45,10 @@ tee -a dist/catto.h > /dev/null << EOF
 #endif
 EOF
 
+sed -i "s/^\([a-zA-Z_][a-zA-Z0-9_]*\** .*).*{\)/CATTO_FN_PREFIX \1/g" dist/catto.h dist/catto-config.h
+sed -i "s/^\([a-zA-Z_][a-zA-Z0-9_]*\** .*=\)/CATTO_FN_PREFIX \1/g" dist/catto.h dist/catto-config.h
+sed -i "s/^\(#define [^)]*) *\)\([a-zA-Z_][a-zA-Z0-9_]*.*(.*{\)/\1CATTO_FN_PREFIX \2/g" dist/catto.h dist/catto-config.h
+
 mkdir -p runtime/build
 mkdir -p examples/build
 

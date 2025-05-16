@@ -8,7 +8,7 @@ void catto_command_dim(catto_Context* context) {
 
     catto_TypedValue listValue = {
         .type = CATTO_DATA_TYPE_LIST,
-        .value.asList = catto_newList()
+        .value = {.asList = catto_newList()}
     };
 
     catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);

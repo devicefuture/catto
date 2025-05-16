@@ -25,6 +25,14 @@
 
 #endif
 
+#ifndef CATTO_FN_PREFIX
+    #ifdef __cplusplus
+        #define CATTO_FN_PREFIX inline
+    #else
+        #define CATTO_FN_PREFIX
+    #endif
+#endif
+
 #define CATTO_USE_STDLIB
 
 #ifdef CATTO_USE_STDLIB
@@ -32,23 +40,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void _catto_log(char* text) {
+CATTO_FN_PREFIX void _catto_log(const char* text) {
     printf("%s", text);
 }
 
-void _catto_logChar(char character) {
+CATTO_FN_PREFIX void _catto_logChar(char character) {
     printf("%c", character);
 }
 
-void* _catto_malloc(CATTO_COUNT size) {
+CATTO_FN_PREFIX void* _catto_malloc(CATTO_COUNT size) {
     return malloc(size);
 }
 
-void* _catto_realloc(void* ptr, CATTO_COUNT size) {
+CATTO_FN_PREFIX void* _catto_realloc(void* ptr, CATTO_COUNT size) {
     return realloc(ptr, size);
 }
 
-void _catto_free(void* ptr) {
+CATTO_FN_PREFIX void _catto_free(void* ptr) {
     free(ptr);
 }
 

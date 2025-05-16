@@ -46,7 +46,7 @@ typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
 typedef struct catto_TypedValue (*catto_FunctionHandlerFunction)(catto_Context* context, catto_DataType returnType);
 
 typedef struct catto_CommandHandler {
-    catto_Char* name;
+    const catto_Char* name;
     catto_CommandHandlerFunction function;
     struct catto_CommandHandler* nextCommandHandler;
 } catto_CommandHandler;
@@ -75,6 +75,7 @@ typedef struct catto_Token {
         catto_Count asLineNumber;
         catto_Float asNumber;
         catto_Char* asString;
+        const catto_Char* asConstString;
         catto_CommandHandler* asCommandHandler;
     } value;
     struct catto_Token* nextToken;
@@ -97,7 +98,7 @@ typedef struct catto_TypedValue {
 } catto_TypedValue;
 
 typedef struct catto_Variable {
-    catto_Char* name;
+    const catto_Char* name;
     catto_TypedValue value;
     struct catto_Variable* nextVariable;
 } catto_Variable;
@@ -135,11 +136,11 @@ typedef struct catto_AstNode {
         } asExpressionLeaf;
         struct {
             struct catto_AstNode* child;
-            catto_Char* operator;
+            catto_Char* operatorValue;
         } asUnaryExpression;
         struct {
             struct catto_AstNode* firstChild;
-            catto_Char** operators;
+            catto_Char** operatorValues;
         } asBinaryExpression;
     } value;
     struct catto_AstNode* nextAstNode;
@@ -149,7 +150,7 @@ typedef catto_TypedValue (*catto_UnaryOperatorFunction)(catto_Context* context, 
 typedef catto_TypedValue (*catto_BinaryOperatorFunction)(catto_Context* context, catto_TypedValue a, catto_TypedValue b);
 
 typedef struct catto_OperatorMapping {
-    catto_Char* operator;
+    const catto_Char* operatorValue;
     catto_UnaryOperatorFunction unaryFunction;
     catto_BinaryOperatorFunction binaryFunction;
 } catto_OperatorMapping;
@@ -158,11 +159,12 @@ catto_Context* catto_newContext();
 void catto_addPointerToGc(catto_Context* context, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
-void catto_addCommand(catto_Context* context, catto_Char* name, catto_CommandHandlerFunction function);
+void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
+void catto_addFunction(catto_Context* context, const catto_Char* name, catto_FunctionHandlerFunction function);
 void catto_addContextStandardCommands(catto_Context* context);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
-void catto_setVariable(catto_Context* context, catto_Char* name, catto_TypedValue value);
+void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
@@ -185,7 +187,7 @@ catto_Bool catto_stringsEqual(const catto_Char* a, const catto_Char* b);
 catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Char* b);
 catto_Char* catto_copyString(const catto_Char* string);
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
-catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
+catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b);
 catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten);
@@ -219,13 +221,13 @@ void catto_debugTokens(catto_Token* firstToken);
 catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parse(catto_Token* firstToken);
-catto_Bool catto_isCommand(catto_AstNode* astNode, catto_Char* command);
+catto_Bool catto_isCommand(catto_AstNode* astNode, const catto_Char* command);
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode);
 catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode);
 catto_Bool catto_setMarkConditionSwitch(catto_AstNode* astNode, catto_Bool enabled);
 catto_Bool catto_isOpeningMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
 catto_Bool catto_isClosingMark(catto_AstNode* astNode, catto_MarkSearchMode searchMode);
-catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
-catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, catto_Char* mark, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, const catto_Char* mark, catto_MarkSearchMode searchMode);
+catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, const catto_Char* mark, catto_MarkSearchMode searchMode);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);

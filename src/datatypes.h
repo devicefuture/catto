@@ -15,7 +15,7 @@ catto_Float catto_asNumber(catto_TypedValue value) {
 catto_TypedValue catto_asTypedNumber(catto_Float value) {
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_NUMBER,
-        .value.asNumber = value
+        .value = {.asNumber = value}
     };
 }
 
@@ -38,7 +38,7 @@ catto_Char* catto_asString(catto_TypedValue value) {
 catto_TypedValue catto_asTypedString(catto_Char* value) {
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
-        .value.asString = catto_copyString(value)
+        .value = {.asString = catto_copyString(value)}
     };
 }
 

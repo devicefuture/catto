@@ -77,17 +77,17 @@ catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, 
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStrings(const catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
     while (matchStrings[i]) {
-        catto_Char* currentString = matchStrings[i];
+        const catto_Char* currentString = matchStrings[i];
 
         if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
             catto_Token* token = catto_addToken(type, currentTokenPtr);
 
-            token->value.asString = currentString;
+            token->value.asConstString = currentString;
 
             *indexPtr = index + catto_stringLength(currentString);
 
@@ -121,7 +121,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
     catto_Count index = *indexPtr;
 
     catto_Char stringOpener = code[index++];
-    catto_Char* currentString = CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
 
     currentString[currentStringIndex] = '\0';
@@ -171,7 +171,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
         }
     }
 
@@ -186,7 +186,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
 
 catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
-    catto_Char* currentString = CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
     catto_Char currentChar = code[index++];
 
@@ -225,7 +225,7 @@ catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
         }
     }
 

@@ -1,7 +1,7 @@
 catto_List* catto_newList() {
     catto_List* list = CATTO_NEW(catto_List);
 
-    list->values = CATTO_MALLOC(0);
+    list->values = (catto_TypedValue*)CATTO_MALLOC(0);
     list->length = 0;
     list->referenceCount = 0;
 
@@ -30,7 +30,7 @@ void catto_destroyList(catto_Context* context, catto_List* list) {
 }
 
 void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
-    list->values = CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
     list->values[list->length - 1] = catto_copyTypedValue(value);
 }
 
@@ -41,7 +41,7 @@ catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list) {
 
     catto_TypedValue value = list->values[--list->length];
 
-    list->values = CATTO_REALLOC(list->values, list->length * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, list->length * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 
@@ -55,7 +55,7 @@ void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count 
         return;
     }
 
-    list->values = CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
 
     for (catto_Count i = list->length - 1; i > index; i--) {
         list->values[i] = list->values[i - 1];
@@ -75,7 +75,7 @@ catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, 
         list->values[i] = list->values[i + 1];
     }
 
-    list->values = CATTO_REALLOC(list->values, (--list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (--list->length) * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 
