@@ -260,7 +260,7 @@ catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
 catto_AstNode* catto_popFromStatementStack(catto_Context* context);
-void catto_load(catto_Context* context, catto_Char* code);
+void catto_load(catto_Context* context, const catto_Char* code);
 void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
 
@@ -268,15 +268,15 @@ catto_Float catto_power(catto_Float base, catto_Int power);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
-catto_Count catto_stringLength(catto_Char* string);
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
-catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b);
-catto_Char* catto_copyString(catto_Char* string);
+catto_Count catto_stringLength(const catto_Char* string);
+catto_Bool catto_stringsEqual(const catto_Char* a, const catto_Char* b);
+catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Char* b);
+catto_Char* catto_copyString(const catto_Char* string);
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
-catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
+catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b);
+catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
@@ -300,7 +300,7 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
-catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
+catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
 
@@ -937,7 +937,7 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
     return lastStatement;
 }
 
-void catto_load(catto_Context* context, catto_Char* code) {
+void catto_load(catto_Context* context, const catto_Char* code) {
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
 
@@ -1178,7 +1178,7 @@ catto_Char* catto_numberToString(catto_Float number) {
 #ifndef CATTO_STRINGS_H_
 #define CATTO_STRINGS_H_
 
-catto_Count catto_stringLength(catto_Char* string) {
+catto_Count catto_stringLength(const catto_Char* string) {
     catto_Count length = 0;
 
     while (string[length] != '\0') {
@@ -1202,7 +1202,7 @@ catto_Bool _catto_charsEqual(catto_Char a, catto_Char b, catto_Bool caseInsensit
     return a == b;
 }
 
-catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
+catto_Bool _catto_stringsEqual(const catto_Char* a, const catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
@@ -1228,15 +1228,15 @@ catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInse
     return CATTO_FALSE;
 }
 
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringsEqual(const catto_Char* a, const catto_Char* b) {
     return _catto_stringsEqual(a, b, CATTO_FALSE);
 }
 
-catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Char* b) {
     return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
-catto_Char* catto_copyString(catto_Char* string) {
+catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
     catto_Char* newString = CATTO_MALLOC(length + 1);
 
@@ -1286,7 +1286,7 @@ catto_Char* catto_reverseString(catto_Char* string) {
     return string;
 }
 
-catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
+catto_Bool _catto_stringStartsWith(const catto_Char* a, const catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
@@ -1312,16 +1312,16 @@ catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool case
     return CATTO_FALSE;
 }
 
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b) {
     return _catto_stringStartsWith(a, b, CATTO_FALSE);
 }
 
-catto_Bool catto_stringStartsWithCaseInsensitive(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringStartsWithCaseInsensitive(const catto_Char* a, const catto_Char* b) {
     return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
 // @source https://stackoverflow.com/a/4392789
-catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
 
     catto_Count i = 0;
@@ -1397,7 +1397,7 @@ catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charac
     return result * factor;
 }
 
-catto_Float catto_stringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     catto_Bool ateSign = CATTO_FALSE;
     catto_Bool negate = CATTO_FALSE;
 
@@ -1688,7 +1688,7 @@ catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr)
     return token;
 }
 
-catto_Token* catto_matchLineNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchLineNumber(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (*currentTokenPtr && (*currentTokenPtr)->type != CATTO_TOKEN_TYPE_NEXT_LINE) {
         return CATTO_NULL;
     }
@@ -1716,7 +1716,7 @@ catto_Token* catto_matchLineNumber(catto_Char* code, catto_Count* indexPtr, catt
     return token;
 }
 
-catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (code[*indexPtr] != matchChar) {
         return CATTO_NULL;
     }
@@ -1728,7 +1728,7 @@ catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, catto_C
     return token;
 }
 
-catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_CommandHandler* currentCommandHandler = context->firstCommandHandler;
 
@@ -1749,7 +1749,7 @@ catto_Token* catto_matchCommand(catto_Context* context, catto_Char* code, catto_
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
@@ -1772,7 +1772,7 @@ catto_Token* catto_matchStrings(catto_Char** matchStrings, catto_TokenType type,
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchNumber(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count charactersEaten = 0;
     catto_Float number = catto_unsignedStringToNumber(code + *indexPtr, &charactersEaten);
 
@@ -1789,7 +1789,7 @@ catto_Token* catto_matchNumber(catto_Char* code, catto_Count* indexPtr, catto_To
     return token;
 }
 
-catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
 
     catto_Char stringOpener = code[index++];
@@ -1856,7 +1856,7 @@ catto_Token* catto_matchStringLiteral(catto_Char* code, catto_Count* indexPtr, c
     return token;
 }
 
-catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Char* currentString = CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
@@ -1910,7 +1910,7 @@ catto_Token* catto_matchIdentifier(catto_Char* code, catto_Count* indexPtr, catt
     return token;
 }
 
-catto_Token* catto_tokenise(catto_Context* context, catto_Char* code) {
+catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;

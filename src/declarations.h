@@ -172,7 +172,7 @@ catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
 catto_AstNode* catto_popFromStatementStack(catto_Context* context);
-void catto_load(catto_Context* context, catto_Char* code);
+void catto_load(catto_Context* context, const catto_Char* code);
 void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
 
@@ -180,15 +180,15 @@ catto_Float catto_power(catto_Float base, catto_Int power);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
-catto_Count catto_stringLength(catto_Char* string);
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b);
-catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b);
-catto_Char* catto_copyString(catto_Char* string);
+catto_Count catto_stringLength(const catto_Char* string);
+catto_Bool catto_stringsEqual(const catto_Char* a, const catto_Char* b);
+catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Char* b);
+catto_Char* catto_copyString(const catto_Char* string);
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character);
 catto_Char* catto_appendToString(catto_Char* a, catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b);
-catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten);
+catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b);
+catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
@@ -212,7 +212,7 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
-catto_Token* catto_tokenise(catto_Context* context, catto_Char* code);
+catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
 

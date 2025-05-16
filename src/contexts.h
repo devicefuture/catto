@@ -483,7 +483,7 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
     return lastStatement;
 }
 
-void catto_load(catto_Context* context, catto_Char* code) {
+void catto_load(catto_Context* context, const catto_Char* code) {
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
 

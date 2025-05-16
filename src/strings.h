@@ -1,7 +1,7 @@
 #ifndef CATTO_STRINGS_H_
 #define CATTO_STRINGS_H_
 
-catto_Count catto_stringLength(catto_Char* string) {
+catto_Count catto_stringLength(const catto_Char* string) {
     catto_Count length = 0;
 
     while (string[length] != '\0') {
@@ -25,7 +25,7 @@ catto_Bool _catto_charsEqual(catto_Char a, catto_Char b, catto_Bool caseInsensit
     return a == b;
 }
 
-catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
+catto_Bool _catto_stringsEqual(const catto_Char* a, const catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
@@ -51,15 +51,15 @@ catto_Bool _catto_stringsEqual(catto_Char* a, catto_Char* b, catto_Bool caseInse
     return CATTO_FALSE;
 }
 
-catto_Bool catto_stringsEqual(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringsEqual(const catto_Char* a, const catto_Char* b) {
     return _catto_stringsEqual(a, b, CATTO_FALSE);
 }
 
-catto_Bool catto_stringsEqualCaseInsensitive(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Char* b) {
     return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
-catto_Char* catto_copyString(catto_Char* string) {
+catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
     catto_Char* newString = CATTO_MALLOC(length + 1);
 
@@ -109,7 +109,7 @@ catto_Char* catto_reverseString(catto_Char* string) {
     return string;
 }
 
-catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool caseInsensitive) {
+catto_Bool _catto_stringStartsWith(const catto_Char* a, const catto_Char* b, catto_Bool caseInsensitive) {
     catto_Count i = 0;
 
     if (a == b) {
@@ -135,16 +135,16 @@ catto_Bool _catto_stringStartsWith(catto_Char* a, catto_Char* b, catto_Bool case
     return CATTO_FALSE;
 }
 
-catto_Bool catto_stringStartsWith(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b) {
     return _catto_stringStartsWith(a, b, CATTO_FALSE);
 }
 
-catto_Bool catto_stringStartsWithCaseInsensitive(catto_Char* a, catto_Char* b) {
+catto_Bool catto_stringStartsWithCaseInsensitive(const catto_Char* a, const catto_Char* b) {
     return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
 // @source https://stackoverflow.com/a/4392789
-catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
 
     catto_Count i = 0;
@@ -220,7 +220,7 @@ catto_Float catto_unsignedStringToNumber(catto_Char* string, catto_Count* charac
     return result * factor;
 }
 
-catto_Float catto_stringToNumber(catto_Char* string, catto_Count* charactersEaten) {
+catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     catto_Bool ateSign = CATTO_FALSE;
     catto_Bool negate = CATTO_FALSE;
 
