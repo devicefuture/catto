@@ -142,6 +142,14 @@ void runCode(catto_Context* context, char* code) {
     }
 }
 
+uint64_t getEpoch() {
+    static struct timeval time;
+
+    gettimeofday(&time, NULL);
+
+    return (uint64_t)(time.tv_sec * 1000) + (uint64_t)(time.tv_usec / 1000);
+}
+
 void inputCommand(catto_Context* context) {
     char* string = catto_asString(catto_evalNextArg(context));
 
@@ -169,14 +177,22 @@ void inputCommand(catto_Context* context) {
     free(line);
 }
 
+void delayCommand(catto_Context* context) {
+    uint64_t delay = catto_asNumber(catto_evalNextArg(context));
+
+    uint64_t startTime = getEpoch();
+
+    while (getEpoch() - startTime < delay) {
+        if (getchar() == '\e') { // Escape
+            interrupted = true;
+
+            break;
+        }
+    }
+}
+
 catto_TypedValue epochFunction(catto_Context* context, catto_DataType returnType) {
-    struct timeval time;
-
-    gettimeofday(&time, NULL);
-
-    uint64_t epoch = (uint64_t)(time.tv_sec * 1000) + (uint64_t)(time.tv_usec / 1000);
-
-    return catto_asTypedNumber(epoch);
+    return catto_asTypedNumber(getEpoch());
 }
 
 int main(int argc, char* argv[]) {
@@ -196,6 +212,7 @@ int main(int argc, char* argv[]) {
 
     catto_addContextStandardCommands(context);
     catto_addCommand(context, "input", &inputCommand);
+    catto_addCommand(context, "delay", &delayCommand);
     catto_addFunction(context, "epoch", &epochFunction);
 
     if (argc >= 2) {
