@@ -3163,29 +3163,29 @@ CATTO_FN_PREFIX void catto_command_stop(catto_Context* context) {
 // src/stdlib/io.h
 
 #ifndef CATTO_CUSTOM_PRINT_COMMAND
-    void catto_command_print(catto_Context* context) {
-        catto_Bool appendFlag = CATTO_FALSE;
+CATTO_FN_PREFIX void catto_command_print(catto_Context* context) {
+    catto_Bool appendFlag = CATTO_FALSE;
 
-        while (catto_hasNextArg(context)) {
-            catto_AstNode* arg = catto_getNextArg(context);
-            catto_Char* string = catto_asString(catto_evalExpression(context, arg));
+    while (catto_hasNextArg(context)) {
+        catto_AstNode* arg = catto_getNextArg(context);
+        catto_Char* string = catto_asString(catto_evalExpression(context, arg));
 
-            if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
-                appendFlag = CATTO_TRUE;
-            }
-
-            CATTO_LOG(string);
-            CATTO_FREE(string);
-
-            if (catto_hasNextArg(context)) {
-                CATTO_LOG(" ");
-            }
+        if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
+            appendFlag = CATTO_TRUE;
         }
 
-        if (!appendFlag) {
-            CATTO_LOG("\n");
+        CATTO_LOG(string);
+        CATTO_FREE(string);
+
+        if (catto_hasNextArg(context)) {
+            CATTO_LOG(" ");
         }
     }
+
+    if (!appendFlag) {
+        CATTO_LOG("\n");
+    }
+}
 #endif
 
 // src/stdlib/lists.h
