@@ -1,5 +1,6 @@
 void catto_addContextStandardCommands(catto_Context* context) {
     // Control flow
+
     catto_addCommand(context, "goto", &catto_command_goto);
     catto_addCommand(context, "gosub", &catto_command_gosub);
     catto_addCommand(context, "return", &catto_command_return);
@@ -17,9 +18,13 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "stop", &catto_command_stop);
 
     // I/O
-    catto_addCommand(context, "print", &catto_command_print);
+
+    #ifndef CATTO_CUSTOM_PRINT_COMMAND
+        catto_addCommand(context, "print", &catto_command_print);
+    #endif
 
     // Lists
+
     catto_addCommand(context, "dim", &catto_command_dim);
     catto_addCommand(context, "push", &catto_command_push);
     catto_addCommand(context, "pop", &catto_command_pop);
@@ -27,6 +32,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "remove", &catto_command_remove);
 
     // Functions
+
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
     catto_addFunction(context, "ceil", &catto_function_ceil);

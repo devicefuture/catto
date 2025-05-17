@@ -40,6 +40,7 @@ typedef struct catto_Context {
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
+    void* userData;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);

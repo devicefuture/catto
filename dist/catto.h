@@ -136,6 +136,7 @@ typedef struct catto_Context {
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
+    void* userData;
 } catto_Context;
 
 typedef void (*catto_CommandHandlerFunction)(catto_Context* context);
@@ -3161,29 +3162,31 @@ CATTO_FN_PREFIX void catto_command_stop(catto_Context* context) {
 
 // src/stdlib/io.h
 
-CATTO_FN_PREFIX void catto_command_print(catto_Context* context) {
-    catto_Bool appendFlag = CATTO_FALSE;
+#ifndef CATTO_CUSTOM_PRINT_COMMAND
+    void catto_command_print(catto_Context* context) {
+        catto_Bool appendFlag = CATTO_FALSE;
 
-    while (catto_hasNextArg(context)) {
-        catto_AstNode* arg = catto_getNextArg(context);
-        catto_Char* string = catto_asString(catto_evalExpression(context, arg));
+        while (catto_hasNextArg(context)) {
+            catto_AstNode* arg = catto_getNextArg(context);
+            catto_Char* string = catto_asString(catto_evalExpression(context, arg));
 
-        if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
-            appendFlag = CATTO_TRUE;
+            if (!catto_hasNextArg(context) && catto_hasAppendFlag(arg)) {
+                appendFlag = CATTO_TRUE;
+            }
+
+            CATTO_LOG(string);
+            CATTO_FREE(string);
+
+            if (catto_hasNextArg(context)) {
+                CATTO_LOG(" ");
+            }
         }
 
-        CATTO_LOG(string);
-        CATTO_FREE(string);
-
-        if (catto_hasNextArg(context)) {
-            CATTO_LOG(" ");
+        if (!appendFlag) {
+            CATTO_LOG("\n");
         }
     }
-
-    if (!appendFlag) {
-        CATTO_LOG("\n");
-    }
-}
+#endif
 
 // src/stdlib/lists.h
 
@@ -3368,6 +3371,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_upper(catto_Context* context, ca
 
 CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     // Control flow
+
     catto_addCommand(context, "goto", &catto_command_goto);
     catto_addCommand(context, "gosub", &catto_command_gosub);
     catto_addCommand(context, "return", &catto_command_return);
@@ -3385,9 +3389,13 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "stop", &catto_command_stop);
 
     // I/O
-    catto_addCommand(context, "print", &catto_command_print);
+
+    #ifndef CATTO_CUSTOM_PRINT_COMMAND
+        catto_addCommand(context, "print", &catto_command_print);
+    #endif
 
     // Lists
+
     catto_addCommand(context, "dim", &catto_command_dim);
     catto_addCommand(context, "push", &catto_command_push);
     catto_addCommand(context, "pop", &catto_command_pop);
@@ -3395,6 +3403,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addCommand(context, "remove", &catto_command_remove);
 
     // Functions
+
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
     catto_addFunction(context, "ceil", &catto_function_ceil);
