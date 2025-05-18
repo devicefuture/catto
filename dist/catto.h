@@ -18,6 +18,7 @@
     #define CATTO_FLOAT double
 
     #define CATTO_MAX_PRECISION 15
+    #define CATTO_EPSILON 1E-15
 #else
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
@@ -26,6 +27,7 @@
     #define CATTO_FLOAT float
 
     #define CATTO_MAX_PRECISION 6
+    #define CATTO_EPSILON 1E-6
 #endif
 
 #endif
@@ -1134,10 +1136,10 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
     catto_Count trailingZeroes = 0;
     catto_Bool anyDigitsInFractionalPart = CATTO_FALSE;
 
-    if (number > 0 && precisionLeft > 0) {
+    if (number > CATTO_EPSILON && precisionLeft > 0) {
         catto_appendCharToString(string, '.');
 
-        while (number > 0 && precisionLeft > 0) {
+        while (number > CATTO_EPSILON && precisionLeft > 0) {
             number *= 10;
 
             catto_Char digit = number;
