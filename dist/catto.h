@@ -520,6 +520,7 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
     catto_gc(context);
 
     CATTO_FREE(context->statementStack);
+    CATTO_FREE(context->pointersToGc);
     CATTO_FREE(context);
 }
 
