@@ -59,6 +59,10 @@ int main(int argc, char* argv[]) {
 
     #ifdef TEST_MEMORY
         while (true) {
+            context = catto_newContext();
+
+            catto_addContextStandardCommands(context);
+
             catto_load(
                 context,
                 "10 print \"Hello, world!\"\n"
@@ -72,6 +76,8 @@ int main(int argc, char* argv[]) {
             );
 
             catto_run(context);
+
+            catto_freeContext(context);
         }
     #endif
 

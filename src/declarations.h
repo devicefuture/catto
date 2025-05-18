@@ -99,7 +99,7 @@ typedef struct catto_TypedValue {
 } catto_TypedValue;
 
 typedef struct catto_Variable {
-    const catto_Char* name;
+    catto_Char* name;
     catto_TypedValue value;
     struct catto_Variable* nextVariable;
 } catto_Variable;
@@ -157,6 +157,7 @@ typedef struct catto_OperatorMapping {
 } catto_OperatorMapping;
 
 catto_Context* catto_newContext();
+void catto_freeContext(catto_Context* context);
 void catto_addPointerToGc(catto_Context* context, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);

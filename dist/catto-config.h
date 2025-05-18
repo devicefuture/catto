@@ -18,7 +18,7 @@
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
     #define CATTO_CHAR char
-    #define CATTO_INT uint32_t
+    #define CATTO_INT int32_t
     #define CATTO_FLOAT float
 
     #define CATTO_MAX_PRECISION 6

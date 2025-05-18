@@ -23,6 +23,38 @@ catto_Context* catto_newContext() {
     return context;
 }
 
+void catto_freeContext(catto_Context* context) {
+    catto_CommandHandler* commandHandler = context->firstCommandHandler;
+
+    while (commandHandler) {
+        catto_CommandHandler* nextCommandHandler = commandHandler->nextCommandHandler;
+
+        CATTO_FREE(commandHandler);
+
+        commandHandler = nextCommandHandler;
+    }
+
+    catto_Variable* variable = context->firstVariable;
+
+    while (variable) {
+        catto_Variable* nextVariable = variable->nextVariable;
+
+        catto_addTypedValueToGc(context, variable->value);
+
+        CATTO_FREE(variable->name);
+        CATTO_FREE(variable);
+
+        variable = nextVariable;
+    }
+
+    catto_freeAstNodes(context->firstParsedStatement);
+
+    catto_gc(context);
+
+    CATTO_FREE(context->statementStack);
+    CATTO_FREE(context);
+}
+
 void catto_addPointerToGc(catto_Context* context, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 

@@ -23,7 +23,7 @@
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
     #define CATTO_CHAR char
-    #define CATTO_INT uint32_t
+    #define CATTO_INT int32_t
     #define CATTO_FLOAT float
 
     #define CATTO_MAX_PRECISION 6
@@ -197,7 +197,7 @@ typedef struct catto_TypedValue {
 } catto_TypedValue;
 
 typedef struct catto_Variable {
-    const catto_Char* name;
+    catto_Char* name;
     catto_TypedValue value;
     struct catto_Variable* nextVariable;
 } catto_Variable;
@@ -255,6 +255,7 @@ typedef struct catto_OperatorMapping {
 } catto_OperatorMapping;
 
 catto_Context* catto_newContext();
+void catto_freeContext(catto_Context* context);
 void catto_addPointerToGc(catto_Context* context, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
@@ -488,6 +489,38 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->subjectLineNumber = 0;
 
     return context;
+}
+
+CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
+    catto_CommandHandler* commandHandler = context->firstCommandHandler;
+
+    while (commandHandler) {
+        catto_CommandHandler* nextCommandHandler = commandHandler->nextCommandHandler;
+
+        CATTO_FREE(commandHandler);
+
+        commandHandler = nextCommandHandler;
+    }
+
+    catto_Variable* variable = context->firstVariable;
+
+    while (variable) {
+        catto_Variable* nextVariable = variable->nextVariable;
+
+        catto_addTypedValueToGc(context, variable->value);
+
+        CATTO_FREE(variable->name);
+        CATTO_FREE(variable);
+
+        variable = nextVariable;
+    }
+
+    catto_freeAstNodes(context->firstParsedStatement);
+
+    catto_gc(context);
+
+    CATTO_FREE(context->statementStack);
+    CATTO_FREE(context);
 }
 
 CATTO_FN_PREFIX void catto_addPointerToGc(catto_Context* context, void* ptr) {
