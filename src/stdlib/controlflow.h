@@ -20,15 +20,69 @@ void catto_command_gosub(catto_Context* context) {
     catto_goto(context, lineNumber);
 }
 
-void catto_command_return(catto_Context* context) {
-    catto_AstNode* statement = catto_popFromStatementStack(context);
+void catto_command_def(catto_Context* context) {
+    catto_AstNode* name = catto_getNextArg(context);
+    catto_Char* subject;
 
-    if (!statement) {
+    if (
+        !name ||
+        name->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
+        !(subject = name->value.asExpressionLeaf.subjectVariable)
+    ) {
+        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        return;
+    }
+
+    catto_AstNode* endStatement = catto_findClosingMark(context->currentParsedStatement, "end", CATTO_MARK_SEARCH_ALL);
+
+    if (!endStatement) {
+        context->errorState = CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK;
+        return;
+    }
+
+    catto_setMarkConditionSwitch(endStatement, CATTO_TRUE);
+
+    catto_Procedure* procedure = catto_getProcedure(context, subject);
+
+    if (!procedure) {
+        procedure = catto_createProcedure(context, subject);
+    }
+
+    if (procedure->parameterCount > 0) {
+        procedure->parameterCount = 0;
+        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, 0);
+    }
+
+    while (catto_hasNextArg(context)) {
+        catto_AstNode* parameterName = catto_getNextArg(context);
+        catto_Char* parameter;
+
+        if (
+            !parameterName ||
+            parameterName->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
+            !(parameter = parameterName->value.asExpressionLeaf.subjectVariable)
+        ) {
+            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+            return;
+        }
+
+        procedure->parameterCount++;
+        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, procedure->parameterCount * sizeof(catto_Char*));
+        procedure->parameterNames[procedure->parameterCount - 1] = parameter;
+    }
+
+    procedure->astNode = context->nextParsedStatement;
+
+    context->nextParsedStatement = endStatement->nextAstNode;
+}
+
+void catto_command_return(catto_Context* context) {
+    if (context->statementStackCount == 0) {
         context->errorState = CATTO_ERROR_STATE_NO_RETURN;
         return;
     }
 
-    context->nextParsedStatement = statement;
+    context->nextParsedStatement = catto_popFromStatementStack(context);
 }
 
 void catto_command_if(catto_Context* context) {
@@ -104,7 +158,18 @@ void catto_command_else(catto_Context* context) {
     }
 }
 
-void catto_command_end(catto_Context* context) {}
+void catto_command_end(catto_Context* context) {
+    catto_Bool isProcedureReturn = catto_asBool(catto_evalNextArg(context));
+
+    if (isProcedureReturn) {
+        if (context->statementStackCount == 0) {
+            context->errorState = CATTO_ERROR_STATE_NO_RETURN;
+            return;
+        }
+
+        context->nextParsedStatement = catto_popFromStatementStack(context);
+    }
+}
 
 void catto_command_for(catto_Context* context) {
     if (!catto_findClosingMark(context->currentParsedStatement, "next", CATTO_MARK_SEARCH_ALL)) {

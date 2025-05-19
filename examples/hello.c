@@ -3,7 +3,7 @@
 #include <catto-config.h>
 #include <catto.h>
 
-// #define TEST_MEMORY
+#define TEST_MEMORY
 
 int main(int argc, char* argv[]) {
     printf("Hello, world!\n");
@@ -66,13 +66,21 @@ int main(int argc, char* argv[]) {
             catto_load(
                 context,
                 "10 print \"Hello, world!\"\n"
-                "20 x=x+1"
+                "def testProcedure a%, b%\n"
+                "print \"Test!\"\n"
+                "print \"a + b = \"; a% + b%\n"
+                "end\n"
+                "20 x=x+1\n"
                 "30 print \"x is:\", x\n"
                 "40 print \"concat \"; x\n"
                 "50 y=x; \" concat\"\n"
                 "60 print y$\n"
                 "70 print max(1, 3)\n"
-                "80 print upper(\"Hello, world!\")"
+                "80 print upper(\"Hello, world!\")\n"
+                "90 testProcedure 1, 2\n"
+                "100 print \"Test called\"\n"
+                "110 testProcedure 3, 5\n"
+                "120 print \"Test called again\""
             );
 
             catto_run(context);

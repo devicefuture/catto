@@ -3,6 +3,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
 
     catto_addCommand(context, "goto", &catto_command_goto);
     catto_addCommand(context, "gosub", &catto_command_gosub);
+    catto_addCommand(context, "def", &catto_command_def);
     catto_addCommand(context, "return", &catto_command_return);
     catto_addCommand(context, "if", &catto_command_if);
     catto_addCommand(context, "else", &catto_command_else);

@@ -5,6 +5,8 @@ catto_Context* catto_newContext() {
     context->lastCommandHandler = CATTO_NULL;
     context->firstVariable = CATTO_NULL;
     context->lastVariable = CATTO_NULL;
+    context->firstProcedure = CATTO_NULL;
+    context->lastProcedure = CATTO_NULL;
 
     context->firstParsedStatement = CATTO_NULL;
     context->nextParsedStatement = CATTO_NULL;
@@ -45,6 +47,18 @@ void catto_freeContext(catto_Context* context) {
         CATTO_FREE(variable);
 
         variable = nextVariable;
+    }
+
+    catto_Procedure* procedure = context->firstProcedure;
+
+    while (procedure) {
+        catto_Procedure* nextProcedure = procedure->nextProcedure;
+
+        CATTO_FREE(procedure->name);
+        CATTO_FREE(procedure->parameterNames);
+        CATTO_FREE(procedure);
+
+        procedure = nextProcedure;
     }
 
     catto_freeAstNodes(context->firstParsedStatement);
@@ -177,6 +191,42 @@ void catto_setVariable(catto_Context* context, const catto_Char* name, catto_Typ
 
         context->lastVariable = variable;
     }
+}
+
+catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name) {
+    catto_Procedure* currentProcedure = context->firstProcedure;
+
+    while (currentProcedure) {
+        if (catto_stringsEqualCaseInsensitive(currentProcedure->name, name)) {
+            return currentProcedure;
+        }
+
+        currentProcedure = currentProcedure->nextProcedure;
+    }
+
+    return CATTO_NULL;
+}
+
+catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name) {
+    catto_Procedure* newProcedure = CATTO_NEW(catto_Procedure);
+
+    newProcedure->name = catto_copyString(name);
+    newProcedure->parameterNames = (catto_Char**)CATTO_MALLOC(0);
+    newProcedure->parameterCount = 0;
+    newProcedure->astNode = CATTO_NULL;
+    newProcedure->nextProcedure = CATTO_NULL;
+
+    if (!context->firstProcedure) {
+        context->firstProcedure = newProcedure;
+    }
+
+    if (context->lastProcedure) {
+        context->lastProcedure->nextProcedure = newProcedure;
+    }
+
+    context->lastProcedure = newProcedure;
+
+    return newProcedure;
 }
 
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value) {
@@ -433,6 +483,7 @@ catto_Bool catto_step(catto_Context* context) {
             catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;
 
             if (!commandHandler) {
+                context->errorState = CATTO_ERROR_STATE_UNKNOWN_PROCEDURE;
                 return CATTO_FALSE;
             }
 
@@ -443,6 +494,26 @@ catto_Bool catto_step(catto_Context* context) {
             }
 
             function(context);
+
+            break;
+        }
+
+        case CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT:
+        {
+            catto_Procedure* procedure = catto_getProcedure(context, currentStatement->value.asStatement.attributes.asProcedure.name);
+
+            if (!procedure) {
+                context->errorState = CATTO_ERROR_STATE_UNKNOWN_PROCEDURE;
+                return CATTO_FALSE;
+            }
+
+            for (catto_Count i = 0; i < procedure->parameterCount; i++) {
+                catto_setVariable(context, procedure->parameterNames[i], catto_evalNextArg(context));
+            }
+
+            catto_pushOntoStatementStack(context, context->nextParsedStatement);
+
+            context->nextParsedStatement = procedure->astNode;
 
             break;
         }
@@ -499,9 +570,9 @@ void catto_goto(catto_Context* context, catto_Count lineNumber) {
 }
 
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement) {
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, context->statementStackCount + 1);
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (++context->statementStackCount) * sizeof(catto_AstNode**));
 
-    context->statementStack[context->statementStackCount++] = statement;
+    context->statementStack[context->statementStackCount - 1] = statement;
 }
 
 catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
@@ -511,7 +582,7 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
 
     catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
 
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, --context->statementStackCount);
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
 
     return lastStatement;
 }

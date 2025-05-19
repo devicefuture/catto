@@ -5,6 +5,7 @@ typedef enum {
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
+    CATTO_ERROR_STATE_UNKNOWN_PROCEDURE,
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
@@ -29,6 +30,8 @@ typedef struct catto_Context {
     struct catto_CommandHandler* lastCommandHandler;
     struct catto_Variable* firstVariable;
     struct catto_Variable* lastVariable;
+    struct catto_Procedure* firstProcedure;
+    struct catto_Procedure* lastProcedure;
     struct catto_AstNode* firstParsedStatement;
     struct catto_AstNode* currentParsedStatement;
     struct catto_AstNode* nextParsedStatement;
@@ -104,9 +107,18 @@ typedef struct catto_Variable {
     struct catto_Variable* nextVariable;
 } catto_Variable;
 
+typedef struct catto_Procedure {
+    catto_Char* name;
+    catto_Char** parameterNames;
+    catto_Count parameterCount;
+    struct catto_AstNode* astNode;
+    struct catto_Procedure* nextProcedure;
+} catto_Procedure;
+
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
+    CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT = 'p',
     CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT = '=',
     CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
     CATTO_AST_NODE_TYPE_UNARY_EXPRESSION = '-',
@@ -125,6 +137,9 @@ typedef struct catto_AstNode {
                     catto_Char* subjectVariable;
                     struct catto_AstNode* index;
                 } asAssignee;
+                struct {
+                    catto_Char* name;
+                } asProcedure;
             } attributes;
             struct catto_AstNode* previousAstNode;
         } asStatement;
@@ -166,6 +181,8 @@ void catto_addFunction(catto_Context* context, const catto_Char* name, catto_Fun
 void catto_addContextStandardCommands(catto_Context* context);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
+catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
+catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name);
 void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
