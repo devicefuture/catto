@@ -3,7 +3,7 @@
 #include <catto-config.h>
 #include <catto.h>
 
-#define TEST_MEMORY
+// #define TEST_MEMORY
 
 int main(int argc, char* argv[]) {
     printf("Hello, world!\n");
