@@ -40,9 +40,7 @@
     #endif
 #endif
 
-#define CATTO_USE_STDLIB
-
-#ifdef CATTO_USE_STDLIB
+#ifndef CATTO_NOSTDLIB
 
 #include <stdio.h>
 #include <stdlib.h>
