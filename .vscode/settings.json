@@ -5,6 +5,8 @@
         "*.tcc": "c",
         "string": "c",
         "istream": "c",
-        "streambuf": "c"
+        "streambuf": "c",
+        "compare": "cpp",
+        "cstdint": "cpp"
     }
 }
