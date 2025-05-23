@@ -274,7 +274,6 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addFunction(catto_Context* context, const catto_Char* name, catto_FunctionHandlerFunction function);
-void catto_addContextStandardCommands(catto_Context* context);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
@@ -291,6 +290,7 @@ void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* stateme
 catto_AstNode* catto_popFromStatementStack(catto_Context* context);
 void catto_load(catto_Context* context, const catto_Char* code);
 void catto_run(catto_Context* context);
+
 void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);
