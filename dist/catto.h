@@ -2652,7 +2652,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
         }
     }
 
-    syntaxError:
+    syntaxError: ;
 
     catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
