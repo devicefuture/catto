@@ -3679,8 +3679,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
 
     // Constants
 
-    catto_addFunction(context, "true", &catto_function_true);
-    catto_addFunction(context, "false", &catto_function_false);
+    catto_setVariable(context, "true", catto_asTypedNumber(1));
+    catto_setVariable(context, "false", catto_asTypedNumber(0));
 }
 
 #endif
