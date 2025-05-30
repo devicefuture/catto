@@ -289,6 +289,25 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
+        if (catto_stringsEqualCaseInsensitive(lineString, "new")) {
+            Line* currentLine;
+
+            while (currentLine) {
+                Line* nextLine = currentLine->nextLine;
+
+                free(currentLine->code);
+                free(currentLine);
+
+                currentLine = nextLine;
+            }
+
+            firstLine = NULL;
+
+            printf("Created new program\n");
+
+            continue;
+        }
+
         catto_Token* firstToken = catto_tokenise(context, lineString);
 
         if (firstToken && firstToken->type == CATTO_TOKEN_TYPE_LINE_NUMBER) {

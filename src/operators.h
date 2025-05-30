@@ -67,7 +67,6 @@ CATTO_BINARY_INTEGER_OPERATOR(catto_binary_bitShiftRight, >>);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_notEqual, !=);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_lessThanOrEqual, <=);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_greaterThanOrEqual, >=);
-CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_equal, ==);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_lessThan, <);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_greaterThan, >);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_and, &&);
@@ -79,6 +78,22 @@ catto_TypedValue catto_binary_power(catto_Context* context, catto_TypedValue a, 
 
 catto_TypedValue catto_binary_xor(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     return catto_asTypedNumber(((catto_Int)catto_asNumber(a) ^ (catto_Int)catto_asNumber(b)) ? 1 : 0);
+}
+
+catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+    if (a.type == CATTO_DATA_TYPE_NUMBER && b.type == CATTO_DATA_TYPE_NUMBER) {
+        return catto_asTypedNumber(catto_asNumber(a) == catto_asNumber(b) ? 1 : 0);
+    }
+
+    catto_Char* aString = catto_asString(a);
+    catto_Char* bString = catto_asString(b);
+
+    catto_TypedValue result = catto_asTypedNumber(catto_stringsEqual(aString, bString) ? 1 : 0);
+
+    CATTO_FREE(aString);
+    CATTO_FREE(bString);
+
+    return result;
 }
 
 catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
