@@ -3555,6 +3555,31 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_max(catto_Context* context, catt
     return catto_asTypedNumber(b > a ? b : a);
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+
+    catto_TypedValue returnValue = catto_asTypedNumber(value[0]);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
+    catto_Int codepoint = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* string = catto_copyString("");
+
+    if (codepoint > 0) {
+        catto_appendCharToString(string, codepoint);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(string);
+
+    CATTO_FREE(string);
+
+    return returnValue;
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
@@ -3637,6 +3662,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "abs", &catto_function_abs);
     catto_addFunction(context, "min", &catto_function_min);
     catto_addFunction(context, "max", &catto_function_max);
+    catto_addFunction(context, "asc", &catto_function_asc);
+    catto_addFunction(context, "chr", &catto_function_chr);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
 }

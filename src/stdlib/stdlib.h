@@ -40,6 +40,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "abs", &catto_function_abs);
     catto_addFunction(context, "min", &catto_function_min);
     catto_addFunction(context, "max", &catto_function_max);
+    catto_addFunction(context, "asc", &catto_function_asc);
+    catto_addFunction(context, "chr", &catto_function_chr);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
 }

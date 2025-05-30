@@ -43,6 +43,31 @@ catto_TypedValue catto_function_max(catto_Context* context, catto_DataType retur
     return catto_asTypedNumber(b > a ? b : a);
 }
 
+catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+
+    catto_TypedValue returnValue = catto_asTypedNumber(value[0]);
+
+    CATTO_FREE(value);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
+    catto_Int codepoint = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* string = catto_copyString("");
+
+    if (codepoint > 0) {
+        catto_appendCharToString(string, codepoint);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(string);
+
+    CATTO_FREE(string);
+
+    return returnValue;
+}
+
 catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
