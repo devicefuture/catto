@@ -39,6 +39,7 @@ include src/stdlib/controlflow.h
 include src/stdlib/io.h
 include src/stdlib/lists.h
 include src/stdlib/functions.h
+include src/stdlib/constants.h
 include src/stdlib/stdlib.h
 
 tee -a dist/catto.h > /dev/null << EOF

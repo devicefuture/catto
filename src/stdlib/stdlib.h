@@ -44,4 +44,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "chr", &catto_function_chr);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
+
+    // Constants
+
+    catto_addFunction(context, "true", &catto_function_true);
+    catto_addFunction(context, "false", &catto_function_false);
 }
