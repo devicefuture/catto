@@ -44,6 +44,24 @@ catto_Token* catto_matchLineNumber(const catto_Char* code, catto_Count* indexPtr
     return token;
 }
 
+catto_Token* catto_matchComment(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+
+    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem"))) {
+        return CATTO_NULL;
+    }
+
+    while (code[index] != '\n' && code[index] != '\0') {
+        index++;
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMENT, currentTokenPtr);
+
+    *indexPtr = index;
+
+    return token;
+}
+
 catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (code[*indexPtr] != matchChar) {
         return CATTO_NULL;
@@ -262,6 +280,10 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
         }
 
         if (catto_matchLineNumber(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchComment(code, &index, &currentToken)) {
             continue;
         }
 

@@ -478,6 +478,9 @@ catto_Bool catto_step(catto_Context* context) {
     catto_gc(context);
 
     switch (currentStatement->type) {
+        case CATTO_AST_NODE_TYPE_NOOP:
+            break;
+
         case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
         {
             catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;

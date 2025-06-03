@@ -32,7 +32,11 @@ int main(int argc, char* argv[]) {
         "50 print 6 * (4 + 5)\n"
         "60 print -5, 6 + 5 * -3, -(2 + 4)\n"
         "70 print abs(-3.5), upper(\"Testing\"), max(1, 3)\n"
-        "80 print var, var[5], var[2 + 3]"
+        "80 print var, var[5], var[2 + 3]\n"
+        "90 # Comment A\n"
+        "100 rem Comment B\n"
+        "110 REM Comment C\n"
+        "120 # Comment D"
     );
 
     printf("Tokens: ");

@@ -355,6 +355,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
     catto_AstNode* lastAstNode = *currentAstNodePtr;
+    catto_Bool noop = CATTO_FALSE;
 
     if (commandToken) {
         catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
@@ -488,9 +489,11 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
         }
     }
 
+    noop = CATTO_TRUE;
+
     syntaxError: ;
 
-    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
+    catto_AstNode* astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
 

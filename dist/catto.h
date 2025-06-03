@@ -155,6 +155,7 @@ typedef enum {
     CATTO_TOKEN_TYPE_SYNTAX_ERROR = '\0',
     CATTO_TOKEN_TYPE_NEXT_LINE = 'N',
     CATTO_TOKEN_TYPE_LINE_NUMBER = 'L',
+    CATTO_TOKEN_TYPE_COMMENT = '#',
     CATTO_TOKEN_TYPE_COMMAND = 'c',
     CATTO_TOKEN_TYPE_STRING = '$',
     CATTO_TOKEN_TYPE_NUMBER = '%',
@@ -213,6 +214,7 @@ typedef struct catto_Procedure {
 
 typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
+    CATTO_AST_NODE_TYPE_NOOP = 'n',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
     CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT = 'p',
     CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT = '=',
@@ -976,6 +978,9 @@ CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
     catto_gc(context);
 
     switch (currentStatement->type) {
+        case CATTO_AST_NODE_TYPE_NOOP:
+            break;
+
         case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
         {
             catto_CommandHandler* commandHandler = currentStatement->value.asStatement.attributes.asCommandHandler;
@@ -1864,6 +1869,24 @@ CATTO_FN_PREFIX catto_Token* catto_matchLineNumber(const catto_Char* code, catto
     return token;
 }
 
+CATTO_FN_PREFIX catto_Token* catto_matchComment(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+    catto_Count index = *indexPtr;
+
+    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem"))) {
+        return CATTO_NULL;
+    }
+
+    while (code[index] != '\n' && code[index] != '\0') {
+        index++;
+    }
+
+    catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMENT, currentTokenPtr);
+
+    *indexPtr = index;
+
+    return token;
+}
+
 CATTO_FN_PREFIX catto_Token* catto_matchChar(catto_Char matchChar, catto_TokenType type, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (code[*indexPtr] != matchChar) {
         return CATTO_NULL;
@@ -2082,6 +2105,10 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
         }
 
         if (catto_matchLineNumber(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchComment(code, &index, &currentToken)) {
             continue;
         }
 
@@ -2534,6 +2561,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
     catto_AstNode* lastAstNode = *currentAstNodePtr;
+    catto_Bool noop = CATTO_FALSE;
 
     if (commandToken) {
         catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
@@ -2667,9 +2695,11 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
         }
     }
 
+    noop = CATTO_TRUE;
+
     syntaxError: ;
 
-    catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
+    catto_AstNode* astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
 
