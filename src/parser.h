@@ -735,6 +735,10 @@ void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 CATTO_LOG("[error]");
                 break;
 
+            case CATTO_AST_NODE_TYPE_NOOP:
+                CATTO_LOG("noop");
+                break;
+
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 if (currentAstNode->value.asStatement.attributes.asCommandHandler) {
                     CATTO_LOG(currentAstNode->value.asStatement.attributes.asCommandHandler->name);

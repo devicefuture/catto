@@ -149,12 +149,32 @@ catto_DataType catto_removeTypeFromVariableName(catto_Char* name) {
     return CATTO_DATA_TYPE_NULL;
 }
 
-catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
+catto_Variable* catto_getVariableObject(catto_Context* context, catto_Char* name, catto_Bool allowOutsideScope) {
     catto_Variable* currentVariable = context->firstVariable;
 
+    if (context->statementStackCount > 0) {
+        // Search for a local variable first
+
+        while (currentVariable) {
+            if (currentVariable->scope == context->statementStackCount && catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
+                return currentVariable;
+            }
+
+            currentVariable = currentVariable->nextVariable;
+        }
+
+        if (!allowOutsideScope) {
+            return CATTO_NULL;
+        }
+
+        // No local variable found; search for a global variable
+
+        currentVariable = context->firstVariable;
+    }
+
     while (currentVariable) {
-        if (catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
-            return &(currentVariable->value);
+        if (currentVariable->scope == 0 && catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
+            return currentVariable;
         }
 
         currentVariable = currentVariable->nextVariable;
@@ -163,22 +183,52 @@ catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
     return CATTO_NULL;
 }
 
-void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value) {
+catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
+    catto_Variable* variable = catto_getVariableObject(context, name, CATTO_TRUE);
+
+    if (!variable) {
+        return CATTO_NULL;
+    }
+
+    return &(variable->value);
+}
+
+catto_Variable* catto_setVariableScoped(catto_Context* context, const catto_Char* name, catto_TypedValue value, catto_Bool allowOutsideScope) {
     catto_Char* untypedName = catto_copyString(name);
     catto_DataType type = (catto_DataType)catto_removeTypeFromVariableName(untypedName);
-    catto_TypedValue* existingVariableValue = catto_getVariable(context, untypedName);
+    catto_Variable* existingVariable = catto_getVariableObject(context, untypedName, allowOutsideScope);
 
-    if (existingVariableValue) {
+    if (existingVariable && existingVariable->argumentReference) {
+        catto_Bool affectLowerScope = context->statementStackCount > 0;
+
+        if (affectLowerScope) {
+            context->statementStackCount--;
+        }
+
+        catto_assignValue(context, existingVariable->argumentReference, value);
+
+        if (affectLowerScope) {
+            context->statementStackCount++;
+        }
+    }
+
+    if (existingVariable) {
+        catto_TypedValue* existingVariableValue = &(existingVariable->value);
+
         catto_addTypedValueToGc(context, *existingVariableValue);
 
         *existingVariableValue = catto_copyTypedValue(value);
 
         CATTO_FREE(untypedName);
+
+        return existingVariable;
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
         variable->name = untypedName;
+        variable->scope = context->statementStackCount;
         variable->value = catto_copyTypedValue(value);
+        variable->argumentReference = CATTO_NULL;
         variable->nextVariable = CATTO_NULL;
 
         if (!context->firstVariable) {
@@ -190,7 +240,13 @@ void catto_setVariable(catto_Context* context, const catto_Char* name, catto_Typ
         }
 
         context->lastVariable = variable;
+
+        return variable;
     }
+}
+
+catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value) {
+    return catto_setVariableScoped(context, name, value, CATTO_TRUE);
 }
 
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name) {
@@ -511,7 +567,16 @@ catto_Bool catto_step(catto_Context* context) {
             }
 
             for (catto_Count i = 0; i < procedure->parameterCount; i++) {
-                catto_setVariable(context, procedure->parameterNames[i], catto_evalNextArg(context));
+                catto_AstNode* argument = catto_getNextArg(context);
+                catto_TypedValue argumentValue = catto_evalExpression(context, argument);
+
+                context->statementStackCount++;
+
+                catto_Variable* variable = catto_setVariableScoped(context, procedure->parameterNames[i], argumentValue, CATTO_FALSE);
+
+                variable->argumentReference = argument;
+
+                context->statementStackCount--;
             }
 
             catto_pushOntoStatementStack(context, context->nextParsedStatement);
@@ -583,9 +648,40 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
         return CATTO_NULL;
     }
 
+    catto_Count scope = context->statementStackCount;
     catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
 
     context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
+
+    // Remove scoped variables
+
+    catto_Variable* variable = context->firstVariable;
+    catto_Variable* previousVariable = CATTO_NULL;
+
+    while (variable) {
+        catto_Variable* nextVariable = variable->nextVariable;
+
+        if (variable->scope == scope) {
+            if (previousVariable) {
+                previousVariable->nextVariable = nextVariable;
+            } else {
+                context->firstVariable = nextVariable;
+            }
+
+            if (context->lastVariable == variable) {
+                context->lastVariable = previousVariable;
+            }
+
+            catto_addTypedValueToGc(context, variable->value);
+
+            CATTO_FREE(variable->name);
+            CATTO_FREE(variable);
+        } else {
+            previousVariable = variable;
+        }
+
+        variable = nextVariable;
+    }
 
     return lastStatement;
 }

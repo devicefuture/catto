@@ -104,7 +104,9 @@ typedef struct catto_TypedValue {
 
 typedef struct catto_Variable {
     catto_Char* name;
+    catto_Count scope;
     catto_TypedValue value;
+    struct catto_AstNode* argumentReference;
     struct catto_Variable* nextVariable;
 } catto_Variable;
 
@@ -181,10 +183,12 @@ void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addFunction(catto_Context* context, const catto_Char* name, catto_FunctionHandlerFunction function);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
+catto_Variable* catto_getVariableObject(catto_Context* context, catto_Char* name, catto_Bool allowOutsideScope);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
+catto_Variable* catto_setVariableScoped(catto_Context* context, const catto_Char* name, catto_TypedValue value, catto_Bool allowOutsideScope);
+catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
 catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name);
-void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);

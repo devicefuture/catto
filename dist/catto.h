@@ -200,7 +200,9 @@ typedef struct catto_TypedValue {
 
 typedef struct catto_Variable {
     catto_Char* name;
+    catto_Count scope;
     catto_TypedValue value;
+    struct catto_AstNode* argumentReference;
     struct catto_Variable* nextVariable;
 } catto_Variable;
 
@@ -277,10 +279,12 @@ void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
 void catto_addFunction(catto_Context* context, const catto_Char* name, catto_FunctionHandlerFunction function);
 catto_DataType catto_removeTypeFromVariableName(catto_Char* name);
+catto_Variable* catto_getVariableObject(catto_Context* context, catto_Char* name, catto_Bool allowOutsideScope);
 catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name);
+catto_Variable* catto_setVariableScoped(catto_Context* context, const catto_Char* name, catto_TypedValue value, catto_Bool allowOutsideScope);
+catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
 catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name);
-void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
@@ -649,12 +653,32 @@ CATTO_FN_PREFIX catto_DataType catto_removeTypeFromVariableName(catto_Char* name
     return CATTO_DATA_TYPE_NULL;
 }
 
-CATTO_FN_PREFIX catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
+CATTO_FN_PREFIX catto_Variable* catto_getVariableObject(catto_Context* context, catto_Char* name, catto_Bool allowOutsideScope) {
     catto_Variable* currentVariable = context->firstVariable;
 
+    if (context->statementStackCount > 0) {
+        // Search for a local variable first
+
+        while (currentVariable) {
+            if (currentVariable->scope == context->statementStackCount && catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
+                return currentVariable;
+            }
+
+            currentVariable = currentVariable->nextVariable;
+        }
+
+        if (!allowOutsideScope) {
+            return CATTO_NULL;
+        }
+
+        // No local variable found; search for a global variable
+
+        currentVariable = context->firstVariable;
+    }
+
     while (currentVariable) {
-        if (catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
-            return &(currentVariable->value);
+        if (currentVariable->scope == 0 && catto_stringsEqualCaseInsensitive(currentVariable->name, name)) {
+            return currentVariable;
         }
 
         currentVariable = currentVariable->nextVariable;
@@ -663,22 +687,52 @@ CATTO_FN_PREFIX catto_TypedValue* catto_getVariable(catto_Context* context, catt
     return CATTO_NULL;
 }
 
-CATTO_FN_PREFIX void catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value) {
+CATTO_FN_PREFIX catto_TypedValue* catto_getVariable(catto_Context* context, catto_Char* name) {
+    catto_Variable* variable = catto_getVariableObject(context, name, CATTO_TRUE);
+
+    if (!variable) {
+        return CATTO_NULL;
+    }
+
+    return &(variable->value);
+}
+
+CATTO_FN_PREFIX catto_Variable* catto_setVariableScoped(catto_Context* context, const catto_Char* name, catto_TypedValue value, catto_Bool allowOutsideScope) {
     catto_Char* untypedName = catto_copyString(name);
     catto_DataType type = (catto_DataType)catto_removeTypeFromVariableName(untypedName);
-    catto_TypedValue* existingVariableValue = catto_getVariable(context, untypedName);
+    catto_Variable* existingVariable = catto_getVariableObject(context, untypedName, allowOutsideScope);
 
-    if (existingVariableValue) {
+    if (existingVariable && existingVariable->argumentReference) {
+        catto_Bool affectLowerScope = context->statementStackCount > 0;
+
+        if (affectLowerScope) {
+            context->statementStackCount--;
+        }
+
+        catto_assignValue(context, existingVariable->argumentReference, value);
+
+        if (affectLowerScope) {
+            context->statementStackCount++;
+        }
+    }
+
+    if (existingVariable) {
+        catto_TypedValue* existingVariableValue = &(existingVariable->value);
+
         catto_addTypedValueToGc(context, *existingVariableValue);
 
         *existingVariableValue = catto_copyTypedValue(value);
 
         CATTO_FREE(untypedName);
+
+        return existingVariable;
     } else {
         catto_Variable* variable = CATTO_NEW(catto_Variable);
 
         variable->name = untypedName;
+        variable->scope = context->statementStackCount;
         variable->value = catto_copyTypedValue(value);
+        variable->argumentReference = CATTO_NULL;
         variable->nextVariable = CATTO_NULL;
 
         if (!context->firstVariable) {
@@ -690,7 +744,13 @@ CATTO_FN_PREFIX void catto_setVariable(catto_Context* context, const catto_Char*
         }
 
         context->lastVariable = variable;
+
+        return variable;
     }
+}
+
+CATTO_FN_PREFIX catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name, catto_TypedValue value) {
+    return catto_setVariableScoped(context, name, value, CATTO_TRUE);
 }
 
 CATTO_FN_PREFIX catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name) {
@@ -1011,7 +1071,16 @@ CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
             }
 
             for (catto_Count i = 0; i < procedure->parameterCount; i++) {
-                catto_setVariable(context, procedure->parameterNames[i], catto_evalNextArg(context));
+                catto_AstNode* argument = catto_getNextArg(context);
+                catto_TypedValue argumentValue = catto_evalExpression(context, argument);
+
+                context->statementStackCount++;
+
+                catto_Variable* variable = catto_setVariableScoped(context, procedure->parameterNames[i], argumentValue, CATTO_FALSE);
+
+                variable->argumentReference = argument;
+
+                context->statementStackCount--;
             }
 
             catto_pushOntoStatementStack(context, context->nextParsedStatement);
@@ -1083,9 +1152,40 @@ CATTO_FN_PREFIX catto_AstNode* catto_popFromStatementStack(catto_Context* contex
         return CATTO_NULL;
     }
 
+    catto_Count scope = context->statementStackCount;
     catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
 
     context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
+
+    // Remove scoped variables
+
+    catto_Variable* variable = context->firstVariable;
+    catto_Variable* previousVariable = CATTO_NULL;
+
+    while (variable) {
+        catto_Variable* nextVariable = variable->nextVariable;
+
+        if (variable->scope == scope) {
+            if (previousVariable) {
+                previousVariable->nextVariable = nextVariable;
+            } else {
+                context->firstVariable = nextVariable;
+            }
+
+            if (context->lastVariable == variable) {
+                context->lastVariable = previousVariable;
+            }
+
+            catto_addTypedValueToGc(context, variable->value);
+
+            CATTO_FREE(variable->name);
+            CATTO_FREE(variable);
+        } else {
+            previousVariable = variable;
+        }
+
+        variable = nextVariable;
+    }
 
     return lastStatement;
 }
@@ -2939,6 +3039,10 @@ CATTO_FN_PREFIX void catto_debugAstNodes(catto_AstNode* firstAstNode) {
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_SYNTAX_ERROR:
                 CATTO_LOG("[error]");
+                break;
+
+            case CATTO_AST_NODE_TYPE_NOOP:
+                CATTO_LOG("noop");
                 break;
 
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
