@@ -643,17 +643,10 @@ void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* stateme
     context->statementStack[context->statementStackCount - 1] = statement;
 }
 
-catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
+void catto_removeScopedVariables(catto_Context* context) {
     if (context->statementStackCount == 0) {
-        return CATTO_NULL;
+        return;
     }
-
-    catto_Count scope = context->statementStackCount;
-    catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
-
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
-
-    // Remove scoped variables
 
     catto_Variable* variable = context->firstVariable;
     catto_Variable* previousVariable = CATTO_NULL;
@@ -661,7 +654,7 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
     while (variable) {
         catto_Variable* nextVariable = variable->nextVariable;
 
-        if (variable->scope == scope) {
+        if (variable->scope >= context->statementStackCount) {
             if (previousVariable) {
                 previousVariable->nextVariable = nextVariable;
             } else {
@@ -682,6 +675,19 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
 
         variable = nextVariable;
     }
+}
+
+catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
+    if (context->statementStackCount == 0) {
+        return CATTO_NULL;
+    }
+
+    catto_removeScopedVariables(context);
+
+    catto_Count scope = context->statementStackCount;
+    catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
+
+    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
 
     return lastStatement;
 }
@@ -751,6 +757,7 @@ void catto_load(catto_Context* context, const catto_Char* code) {
     context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, 0);
     context->statementStackCount = 0;
 
+    catto_removeScopedVariables(context);
     catto_freeTokens(firstToken);
 }
 

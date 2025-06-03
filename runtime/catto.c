@@ -222,6 +222,8 @@ int main(int argc, char* argv[]) {
         if (!fp) {
             fprintf(stderr, "Error when reading file\n");
 
+            tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
+
             return 1;
         }
 
