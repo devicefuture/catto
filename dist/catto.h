@@ -1370,14 +1370,14 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
     number -= integralPart; // Now fractional part
 
     do {
-        catto_appendCharToString(string, (catto_Char)('0' + (integralPart % 10)));
+        string = catto_appendCharToString(string, (catto_Char)('0' + (integralPart % 10)));
 
         integralPart /= 10;
         precisionLeft--;
     } while (integralPart > 0);
 
     if (isNegative) {
-        catto_appendCharToString(string, '-');
+        string = catto_appendCharToString(string, '-');
     }
 
     catto_reverseString(string);
@@ -1386,7 +1386,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
     catto_Bool anyDigitsInFractionalPart = CATTO_FALSE;
 
     if (number > CATTO_EPSILON && precisionLeft > 0) {
-        catto_appendCharToString(string, '.');
+        string = catto_appendCharToString(string, '.');
 
         while (number > CATTO_EPSILON && precisionLeft > 0) {
             number *= 10;
@@ -1400,7 +1400,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
                 anyDigitsInFractionalPart = CATTO_TRUE;
             }
 
-            catto_appendCharToString(string, (catto_Char)('0' + digit));
+            string = catto_appendCharToString(string, (catto_Char)('0' + digit));
 
             number -= digit;
             precisionLeft--;
@@ -1419,10 +1419,10 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
     }
 
     if (exponent != 0) {
-        catto_appendCharToString(string, 'E');
+        string = catto_appendCharToString(string, 'E');
 
         if (exponent > 0) {
-            catto_appendCharToString(string, '+');
+            string = catto_appendCharToString(string, '+');
         }
 
         catto_Char* exponentString = catto_numberToString(exponent);
@@ -3739,7 +3739,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catt
     catto_Char* string = catto_copyString("");
 
     if (codepoint > 0) {
-        catto_appendCharToString(string, codepoint);
+        string = catto_appendCharToString(string, codepoint);
     }
 
     catto_TypedValue returnValue = catto_asTypedString(string);
