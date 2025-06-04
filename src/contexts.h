@@ -657,11 +657,13 @@ void catto_removeScopedVariables(catto_Context* context) {
         if (variable->scope >= context->statementStackCount) {
             if (previousVariable) {
                 previousVariable->nextVariable = nextVariable;
-            } else {
+            }
+            
+            if (variable == context->firstVariable) {
                 context->firstVariable = nextVariable;
             }
 
-            if (context->lastVariable == variable) {
+            if (variable == context->lastVariable) {
                 context->lastVariable = previousVariable;
             }
 

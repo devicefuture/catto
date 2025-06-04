@@ -58,7 +58,7 @@ catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType retur
     catto_Char* string = catto_copyString("");
 
     if (codepoint > 0) {
-        catto_appendCharToString(string, codepoint);
+        string = catto_appendCharToString(string, codepoint);
     }
 
     catto_TypedValue returnValue = catto_asTypedString(string);

@@ -1161,11 +1161,13 @@ CATTO_FN_PREFIX void catto_removeScopedVariables(catto_Context* context) {
         if (variable->scope >= context->statementStackCount) {
             if (previousVariable) {
                 previousVariable->nextVariable = nextVariable;
-            } else {
+            }
+            
+            if (variable == context->firstVariable) {
                 context->firstVariable = nextVariable;
             }
 
-            if (context->lastVariable == variable) {
+            if (variable == context->lastVariable) {
                 context->lastVariable = previousVariable;
             }
 
@@ -2759,9 +2761,9 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
             parsedAccessor = CATTO_TRUE;
         }
 
-        catto_Token* assignmentOperatorToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPERATOR);
+        catto_Token* assignmentOperatorToken = catto_eatIfKeyword(currentTokenPtr, "=");
 
-        if (assignmentOperatorToken && catto_stringsEqualCaseInsensitive(assignmentOperatorToken->value.asString, "=")) {
+        if (assignmentOperatorToken) {
             catto_AstNode* value = CATTO_NULL;
 
             if (!catto_parseExpression(currentTokenPtr, &value)) {
@@ -3058,6 +3060,17 @@ CATTO_FN_PREFIX void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 } else {
                     CATTO_LOG("[unkn]");
                 }
+
+                CATTO_LOG_CHAR('(');
+
+                catto_debugAstNodes(currentAstNode->value.asStatement.firstArgument);
+
+                CATTO_LOG_CHAR(')');
+
+                break;
+
+            case CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT:
+                CATTO_LOG(currentAstNode->value.asStatement.attributes.asProcedure.name);
 
                 CATTO_LOG_CHAR('(');
 
