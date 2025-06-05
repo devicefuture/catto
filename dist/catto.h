@@ -2475,6 +2475,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTo
         (
             !tokenPtrAfter || (tokenPtrAfter && (
                 tokenPtrAfter->type == CATTO_TOKEN_TYPE_NEXT_LINE ||
+                tokenPtrAfter->type == CATTO_TOKEN_TYPE_COMMENT ||
                 tokenPtrAfter->type == CATTO_TOKEN_TYPE_DELIMETER ||
                 tokenPtrAfter->type == CATTO_TOKEN_TYPE_STATEMENT_DELIMETER
             ))
@@ -2811,6 +2812,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
     catto_AstNode* astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+    astNode->value.asStatement.previousAstNode = lastAstNode;
 
     catto_eat(currentTokenPtr);
 
@@ -3051,7 +3053,7 @@ CATTO_FN_PREFIX void catto_debugAstNodes(catto_AstNode* firstAstNode) {
                 break;
 
             case CATTO_AST_NODE_TYPE_NOOP:
-                CATTO_LOG("noop");
+                CATTO_LOG("[noop]");
                 break;
 
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
