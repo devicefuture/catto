@@ -1,5 +1,5 @@
 # `catto` 😺🖥️
-A C runtime library for the [atto programming language](https://atto.devicefuture.org).
+A C runtime library for the [atto programming language](https://atto.devicefuture.org). It's used by the [DigiCron smartwatch](https://github.com/devicefuture/digicron) and [atto.js](https://github.com/devicefuture/atto.js).
 
 ## Building
 To build the catto library, run:
