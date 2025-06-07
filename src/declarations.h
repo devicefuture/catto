@@ -43,6 +43,7 @@ typedef struct catto_Context {
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
+    catto_Bool scrawlMode;
     void* userData;
 } catto_Context;
 

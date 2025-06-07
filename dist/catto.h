@@ -139,6 +139,7 @@ typedef struct catto_Context {
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
+    catto_Bool scrawlMode;
     void* userData;
 } catto_Context;
 
@@ -525,6 +526,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
 
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
+    context->scrawlMode = CATTO_FALSE;
 
     return context;
 }
@@ -1950,6 +1952,15 @@ CATTO_FN_PREFIX catto_Token* catto_addToken(catto_TokenType type, catto_Token** 
     return token;
 }
 
+CATTO_FN_PREFIX catto_Bool catto_onWordBoundary(const catto_Char* code, catto_Count index) {
+    return !(
+        (code[index] >= 'a' && code[index] <= 'z') ||
+        (code[index] >= 'A' && code[index] <= 'Z') ||
+        (code[index] >= '0' && code[index] <= '9') ||
+        code[index] == '_'
+    );
+}
+
 CATTO_FN_PREFIX catto_Token* catto_matchLineNumber(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (*currentTokenPtr && (*currentTokenPtr)->type != CATTO_TOKEN_TYPE_NEXT_LINE) {
         return CATTO_NULL;
@@ -2014,11 +2025,27 @@ CATTO_FN_PREFIX catto_Token* catto_matchCommand(catto_Context* context, const ca
 
     while (currentCommandHandler) {
         if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
+            catto_Count newIndex = index + catto_stringLength(currentCommandHandler->name);
+
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+                currentCommandHandler = currentCommandHandler->nextCommandHandler;
+
+                continue;
+            }
+
+            if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "scrawl")) {
+                context->scrawlMode = CATTO_TRUE;
+            }
+
+            if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "noscrawl")) {
+                context->scrawlMode = CATTO_FALSE;
+            }
+
             catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
 
             token->value.asCommandHandler = currentCommandHandler;
 
-            *indexPtr = index + catto_stringLength(currentCommandHandler->name);
+            *indexPtr = newIndex;
 
             return token;
         }
@@ -2136,7 +2163,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchStringLiteral(const catto_Char* code, ca
     return token;
 }
 
-CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
@@ -2165,7 +2192,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(const catto_Char* code, catto
         } else if (!(
             (currentChar >= 'a' && currentChar <= 'z') ||
             (currentChar >= 'A' && currentChar <= 'Z') ||
-            (currentChar >= '0' && currentChar <= '9') ||
+            (!context->scrawlMode && currentChar >= '0' && currentChar <= '9') ||
             currentChar == '_'
         )) {
             index--;
@@ -2257,7 +2284,7 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
             continue;
         }
 
-        if (catto_matchIdentifier(code, &index, &currentToken)) {
+        if (catto_matchIdentifier(context, code, &index, &currentToken)) {
             continue;
         }
 
@@ -3585,6 +3612,14 @@ CATTO_FN_PREFIX void catto_command_print(catto_Context* context) {
 }
 #endif
 
+CATTO_FN_PREFIX void catto_command_scrawl(catto_Context* context) {
+    context->scrawlMode = CATTO_TRUE;
+}
+
+CATTO_FN_PREFIX void catto_command_noscrawl(catto_Context* context) {
+    context->scrawlMode = CATTO_FALSE;
+}
+
 // src/stdlib/lists.h
 
 CATTO_FN_PREFIX void catto_command_dim(catto_Context* context) {
@@ -3816,6 +3851,9 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     #ifndef CATTO_CUSTOM_PRINT_COMMAND
         catto_addCommand(context, "print", &catto_command_print);
     #endif
+
+    catto_addCommand(context, "scrawl", &catto_command_scrawl);
+    catto_addCommand(context, "noscrawl", &catto_command_noscrawl);
 
     // Lists
 

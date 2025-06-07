@@ -23,3 +23,11 @@ void catto_command_print(catto_Context* context) {
     }
 }
 #endif
+
+void catto_command_scrawl(catto_Context* context) {
+    context->scrawlMode = CATTO_TRUE;
+}
+
+void catto_command_noscrawl(catto_Context* context) {
+    context->scrawlMode = CATTO_FALSE;
+}

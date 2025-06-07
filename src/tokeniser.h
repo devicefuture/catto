@@ -16,6 +16,15 @@ catto_Token* catto_addToken(catto_TokenType type, catto_Token** currentTokenPtr)
     return token;
 }
 
+catto_Bool catto_onWordBoundary(const catto_Char* code, catto_Count index) {
+    return !(
+        (code[index] >= 'a' && code[index] <= 'z') ||
+        (code[index] >= 'A' && code[index] <= 'Z') ||
+        (code[index] >= '0' && code[index] <= '9') ||
+        code[index] == '_'
+    );
+}
+
 catto_Token* catto_matchLineNumber(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     if (*currentTokenPtr && (*currentTokenPtr)->type != CATTO_TOKEN_TYPE_NEXT_LINE) {
         return CATTO_NULL;
@@ -80,11 +89,27 @@ catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, 
 
     while (currentCommandHandler) {
         if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
+            catto_Count newIndex = index + catto_stringLength(currentCommandHandler->name);
+
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+                currentCommandHandler = currentCommandHandler->nextCommandHandler;
+
+                continue;
+            }
+
+            if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "scrawl")) {
+                context->scrawlMode = CATTO_TRUE;
+            }
+
+            if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "noscrawl")) {
+                context->scrawlMode = CATTO_FALSE;
+            }
+
             catto_Token* token = catto_addToken(CATTO_TOKEN_TYPE_COMMAND, currentTokenPtr);
 
             token->value.asCommandHandler = currentCommandHandler;
 
-            *indexPtr = index + catto_stringLength(currentCommandHandler->name);
+            *indexPtr = newIndex;
 
             return token;
         }
@@ -202,7 +227,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
     return token;
 }
 
-catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
     catto_Count currentStringIndex = 0;
@@ -231,7 +256,7 @@ catto_Token* catto_matchIdentifier(const catto_Char* code, catto_Count* indexPtr
         } else if (!(
             (currentChar >= 'a' && currentChar <= 'z') ||
             (currentChar >= 'A' && currentChar <= 'Z') ||
-            (currentChar >= '0' && currentChar <= '9') ||
+            (!context->scrawlMode && currentChar >= '0' && currentChar <= '9') ||
             currentChar == '_'
         )) {
             index--;
@@ -323,7 +348,7 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
             continue;
         }
 
-        if (catto_matchIdentifier(code, &index, &currentToken)) {
+        if (catto_matchIdentifier(context, code, &index, &currentToken)) {
             continue;
         }
 

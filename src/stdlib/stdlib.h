@@ -24,6 +24,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
         catto_addCommand(context, "print", &catto_command_print);
     #endif
 
+    catto_addCommand(context, "scrawl", &catto_command_scrawl);
+    catto_addCommand(context, "noscrawl", &catto_command_noscrawl);
+
     // Lists
 
     catto_addCommand(context, "dim", &catto_command_dim);
