@@ -50,6 +50,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "bin", &catto_function_bin);
     catto_addFunction(context, "oct", &catto_function_oct);
     catto_addFunction(context, "hex", &catto_function_hex);
+    catto_addFunction(context, "len", &catto_function_len);
+    catto_addFunction(context, "last", &catto_function_last);
 
     // Constants
 

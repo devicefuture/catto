@@ -3932,6 +3932,32 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_hex(catto_Context* context, catt
     return catto_function_base(context, 16, returnType);
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue value = catto_evalNextArg(context);
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedNumber(value.value.asList->length);
+    }
+
+    return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue value = catto_evalNextArg(context);
+
+    if (value.type != CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedNumber(0);
+    }
+
+    catto_List* list = value.value.asList;
+
+    if (list->length == 0) {
+        return catto_asTypedNumber(0);
+    }
+
+    return catto_copyTypedValue(list->values[list->length - 1]);
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
@@ -4024,6 +4050,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "bin", &catto_function_bin);
     catto_addFunction(context, "oct", &catto_function_oct);
     catto_addFunction(context, "hex", &catto_function_hex);
+    catto_addFunction(context, "len", &catto_function_len);
+    catto_addFunction(context, "last", &catto_function_last);
 
     // Constants
 

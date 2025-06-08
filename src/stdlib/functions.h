@@ -97,6 +97,32 @@ catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType retur
     return catto_function_base(context, 16, returnType);
 }
 
+catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue value = catto_evalNextArg(context);
+
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedNumber(value.value.asList->length);
+    }
+
+    return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
+}
+
+catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue value = catto_evalNextArg(context);
+
+    if (value.type != CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedNumber(0);
+    }
+
+    catto_List* list = value.value.asList;
+
+    if (list->length == 0) {
+        return catto_asTypedNumber(0);
+    }
+
+    return catto_copyTypedValue(list->values[list->length - 1]);
+}
+
 catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
