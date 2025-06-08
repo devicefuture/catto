@@ -68,6 +68,35 @@ catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType retur
     return returnValue;
 }
 
+catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
+    if (returnType == CATTO_DATA_TYPE_STRING) {
+        catto_Float number = catto_asNumber(catto_evalNextArg(context));
+
+        return catto_asTypedString(catto_numberToBaseString(number, base));
+    }
+
+    catto_Char* string = catto_asString(catto_evalNextArg(context));
+
+    catto_Count charactersEaten;
+    catto_TypedValue returnValue = catto_asTypedNumber(catto_stringToBaseNumber(string, base, &charactersEaten));
+
+    CATTO_FREE(string);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 2, returnType);
+}
+
+catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 8, returnType);
+}
+
+catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 16, returnType);
+}
+
 catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;

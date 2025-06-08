@@ -59,7 +59,7 @@ catto_Char* catto_numberToString(catto_Float number) {
         number *= -1;
     }
 
-    if (number == CATTO_NAN) {
+    if (number != number) {
         return catto_copyString("NaN");
     }
 
@@ -156,6 +156,49 @@ catto_Char* catto_numberToString(catto_Float number) {
 
         CATTO_FREE(exponentString);
     }
+
+    return string;
+}
+
+catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    if (number != number) {
+        return catto_copyString("NaN");
+    }
+
+    if (number == CATTO_INFINITY) {
+        return catto_copyString(isNegative ? "-Infinity" : "Infinity");
+    }
+
+    catto_Char* string = catto_copyString("");
+
+    do {
+        catto_Char digit = (catto_Int)number % base;
+
+        if (digit < 10) {
+            digit += '0';
+        } else if (digit < 16) {
+            digit += 'a' - 10;
+        } else {
+            digit = '?';
+        }
+
+        string = catto_appendCharToString(string, digit);
+
+        number /= base;
+    } while (number >= 1);
+
+    if (isNegative) {
+        string = catto_appendCharToString(string, '-');
+    }
+
+    catto_reverseString(string);
 
     return string;
 }

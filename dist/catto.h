@@ -313,6 +313,9 @@ catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b);
 catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_unsignedStringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
+catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
@@ -1336,7 +1339,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
         number *= -1;
     }
 
-    if (number == CATTO_NAN) {
+    if (number != number) {
         return catto_copyString("NaN");
     }
 
@@ -1433,6 +1436,49 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
 
         CATTO_FREE(exponentString);
     }
+
+    return string;
+}
+
+CATTO_FN_PREFIX catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
+    catto_Bool isNegative = CATTO_FALSE;
+
+    if (number < 0) {
+        isNegative = CATTO_TRUE;
+        number *= -1;
+    }
+
+    if (number != number) {
+        return catto_copyString("NaN");
+    }
+
+    if (number == CATTO_INFINITY) {
+        return catto_copyString(isNegative ? "-Infinity" : "Infinity");
+    }
+
+    catto_Char* string = catto_copyString("");
+
+    do {
+        catto_Char digit = (catto_Int)number % base;
+
+        if (digit < 10) {
+            digit += '0';
+        } else if (digit < 16) {
+            digit += 'a' - 10;
+        } else {
+            digit = '?';
+        }
+
+        string = catto_appendCharToString(string, digit);
+
+        number /= base;
+    } while (number >= 1);
+
+    if (isNegative) {
+        string = catto_appendCharToString(string, '-');
+    }
+
+    catto_reverseString(string);
 
     return string;
 }
@@ -1584,6 +1630,38 @@ CATTO_FN_PREFIX catto_Bool catto_stringStartsWithCaseInsensitive(const catto_Cha
     return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
+CATTO_FN_PREFIX catto_Float catto_unsignedStringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten) {
+    *charactersEaten = 0;
+
+    catto_Count i = 0;
+    catto_Float result = 0;
+
+    while (string[i] != '\0') {
+        if (
+            (string[i] == '0' || string[i] == '1') ||
+            (base >= 8 && string[i] >= '2' && string[i] <= '7') ||
+            (base >= 10 && string[i] >= '8' && string[i] <= '9')
+        ) {
+            result *= base;
+            result += string[i] - '0';
+        } else if (base >= 16 && string[i] >= 'A' && string[i] <= 'F') {
+            result *= base;
+            result += string[i] - 'A' + 0xA;
+        } else if (base >= 16 && string[i] >= 'a' && string[i] <= 'f') {
+            result *= base;
+            result += string[i] - 'a' + 0xA;
+        } else {
+            break;
+        }
+
+        i++;
+    }
+
+    *charactersEaten = i;
+
+    return result;
+}
+
 // @source https://stackoverflow.com/a/4392789
 CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
@@ -1597,6 +1675,22 @@ CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* strin
     catto_Bool hadDigit = CATTO_FALSE;
     catto_Bool afterExponentMark = CATTO_FALSE;
     catto_Bool afterExponentSign = CATTO_FALSE;
+
+    if (string[0] == '0') {
+        switch (string[1]) {
+            case 'b': case 'B': result = catto_unsignedStringToBaseNumber(string + 2, 2, charactersEaten); break;
+            case 'o': case 'O': result = catto_unsignedStringToBaseNumber(string + 2, 8, charactersEaten); break;
+            case 'x': case 'X': result = catto_unsignedStringToBaseNumber(string + 2, 16, charactersEaten); break;
+
+            default: break;
+        }
+
+        if (*charactersEaten > 0) {
+            *charactersEaten += 2;
+
+            return result;
+        }
+    }
 
     while (string[i] != '\0') {
         catto_Char character = string[i];
@@ -1672,6 +1766,29 @@ CATTO_FN_PREFIX catto_Float catto_stringToNumber(const catto_Char* string, catto
     }
 
     catto_Float result = catto_unsignedStringToNumber(string, charactersEaten);
+
+    if (ateSign) {
+        (*charactersEaten)++;
+    }
+
+    if (negate) {
+        result *= -1;
+    }
+
+    return result;
+}
+
+CATTO_FN_PREFIX catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten) {
+    catto_Bool ateSign = CATTO_FALSE;
+    catto_Bool negate = CATTO_FALSE;
+
+    if (string[0] == '+' || string[0] == '-') {
+        negate = string[0] == '-';
+        ateSign = CATTO_TRUE;
+        string += 1;
+    }
+
+    catto_Float result = catto_unsignedStringToBaseNumber(string, base, charactersEaten);
 
     if (ateSign) {
         (*charactersEaten)++;
@@ -3786,6 +3903,35 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catt
     return returnValue;
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
+    if (returnType == CATTO_DATA_TYPE_STRING) {
+        catto_Float number = catto_asNumber(catto_evalNextArg(context));
+
+        return catto_asTypedString(catto_numberToBaseString(number, base));
+    }
+
+    catto_Char* string = catto_asString(catto_evalNextArg(context));
+
+    catto_Count charactersEaten;
+    catto_TypedValue returnValue = catto_asTypedNumber(catto_stringToBaseNumber(string, base, &charactersEaten));
+
+    CATTO_FREE(string);
+
+    return returnValue;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 2, returnType);
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 8, returnType);
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
+    return catto_function_base(context, 16, returnType);
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
@@ -3875,6 +4021,9 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "chr", &catto_function_chr);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
+    catto_addFunction(context, "bin", &catto_function_bin);
+    catto_addFunction(context, "oct", &catto_function_oct);
+    catto_addFunction(context, "hex", &catto_function_hex);
 
     // Constants
 

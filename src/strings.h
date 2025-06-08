@@ -143,6 +143,38 @@ catto_Bool catto_stringStartsWithCaseInsensitive(const catto_Char* a, const catt
     return _catto_stringStartsWith(a, b, CATTO_TRUE);
 }
 
+catto_Float catto_unsignedStringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten) {
+    *charactersEaten = 0;
+
+    catto_Count i = 0;
+    catto_Float result = 0;
+
+    while (string[i] != '\0') {
+        if (
+            (string[i] == '0' || string[i] == '1') ||
+            (base >= 8 && string[i] >= '2' && string[i] <= '7') ||
+            (base >= 10 && string[i] >= '8' && string[i] <= '9')
+        ) {
+            result *= base;
+            result += string[i] - '0';
+        } else if (base >= 16 && string[i] >= 'A' && string[i] <= 'F') {
+            result *= base;
+            result += string[i] - 'A' + 0xA;
+        } else if (base >= 16 && string[i] >= 'a' && string[i] <= 'f') {
+            result *= base;
+            result += string[i] - 'a' + 0xA;
+        } else {
+            break;
+        }
+
+        i++;
+    }
+
+    *charactersEaten = i;
+
+    return result;
+}
+
 // @source https://stackoverflow.com/a/4392789
 catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten) {
     *charactersEaten = 0;
@@ -156,6 +188,22 @@ catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* 
     catto_Bool hadDigit = CATTO_FALSE;
     catto_Bool afterExponentMark = CATTO_FALSE;
     catto_Bool afterExponentSign = CATTO_FALSE;
+
+    if (string[0] == '0') {
+        switch (string[1]) {
+            case 'b': case 'B': result = catto_unsignedStringToBaseNumber(string + 2, 2, charactersEaten); break;
+            case 'o': case 'O': result = catto_unsignedStringToBaseNumber(string + 2, 8, charactersEaten); break;
+            case 'x': case 'X': result = catto_unsignedStringToBaseNumber(string + 2, 16, charactersEaten); break;
+
+            default: break;
+        }
+
+        if (*charactersEaten > 0) {
+            *charactersEaten += 2;
+
+            return result;
+        }
+    }
 
     while (string[i] != '\0') {
         catto_Char character = string[i];
@@ -231,6 +279,29 @@ catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* characte
     }
 
     catto_Float result = catto_unsignedStringToNumber(string, charactersEaten);
+
+    if (ateSign) {
+        (*charactersEaten)++;
+    }
+
+    if (negate) {
+        result *= -1;
+    }
+
+    return result;
+}
+
+catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten) {
+    catto_Bool ateSign = CATTO_FALSE;
+    catto_Bool negate = CATTO_FALSE;
+
+    if (string[0] == '+' || string[0] == '-') {
+        negate = string[0] == '-';
+        ateSign = CATTO_TRUE;
+        string += 1;
+    }
+
+    catto_Float result = catto_unsignedStringToBaseNumber(string, base, charactersEaten);
 
     if (ateSign) {
         (*charactersEaten)++;

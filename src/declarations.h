@@ -217,6 +217,9 @@ catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b);
 catto_Char* catto_reverseString(catto_Char* string);
 catto_Bool catto_stringStartsWith(const catto_Char* a, const catto_Char* b);
 catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_unsignedStringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
+catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* charactersEaten);
+catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
