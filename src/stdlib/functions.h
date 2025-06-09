@@ -65,14 +65,22 @@ catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType retur
 
     CATTO_FREE(string);
 
+    catto_addTypedValueToGc(context, returnValue);
+
     return returnValue;
 }
 
 catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
     if (returnType == CATTO_DATA_TYPE_STRING) {
         catto_Float number = catto_asNumber(catto_evalNextArg(context));
+        catto_Char* string = catto_numberToBaseString(number, base);
+        catto_TypedValue returnValue = catto_asTypedString(string);
 
-        return catto_asTypedString(catto_numberToBaseString(number, base));
+        CATTO_FREE(string);
+
+        catto_addTypedValueToGc(context, returnValue);
+
+        return returnValue;
     }
 
     catto_Char* string = catto_asString(catto_evalNextArg(context));
@@ -120,7 +128,11 @@ catto_TypedValue catto_function_last(catto_Context* context, catto_DataType retu
         return catto_asTypedNumber(0);
     }
 
-    return catto_copyTypedValue(list->values[list->length - 1]);
+    catto_TypedValue returnValue = catto_copyTypedValue(list->values[list->length - 1]);
+
+    catto_addTypedValueToGc(context, returnValue);
+
+    return returnValue;
 }
 
 catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
@@ -138,6 +150,8 @@ catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType ret
     catto_TypedValue returnValue = catto_asTypedString(value);
 
     CATTO_FREE(value);
+
+    catto_addTypedValueToGc(context, returnValue);
 
     return returnValue;
 }
@@ -157,6 +171,8 @@ catto_TypedValue catto_function_upper(catto_Context* context, catto_DataType ret
     catto_TypedValue returnValue = catto_asTypedString(value);
 
     CATTO_FREE(value);
+
+    catto_addTypedValueToGc(context, returnValue);
 
     return returnValue;
 }
