@@ -14,6 +14,7 @@
 
     #define CATTO_MAX_PRECISION 15
     #define CATTO_EPSILON 1E-15
+    #define CATTO_SQRT_ITERATIONS 55
 #else
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
@@ -23,6 +24,7 @@
 
     #define CATTO_MAX_PRECISION 6
     #define CATTO_EPSILON 1E-6
+    #define CATTO_SQRT_ITERATIONS 27
 #endif
 
 #endif

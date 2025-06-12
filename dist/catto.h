@@ -19,6 +19,7 @@
 
     #define CATTO_MAX_PRECISION 15
     #define CATTO_EPSILON 1E-15
+    #define CATTO_SQRT_ITERATIONS 55
 #else
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
@@ -28,6 +29,7 @@
 
     #define CATTO_MAX_PRECISION 6
     #define CATTO_EPSILON 1E-6
+    #define CATTO_SQRT_ITERATIONS 27
 #endif
 
 #endif
@@ -301,6 +303,7 @@ void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);
+catto_Float catto_sqrt(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
@@ -1293,6 +1296,21 @@ CATTO_FN_PREFIX catto_Float catto_power(catto_Float base, catto_Int power) {
     while (power > 1) {
         result *= base;
         power--;
+    }
+
+    return result;
+}
+
+// @source https://stackoverflow.com/a/49991852
+CATTO_FN_PREFIX catto_Float catto_sqrt(catto_Float value) {
+    catto_Float result = 1;
+
+    if (value < 0) {
+        return CATTO_NAN;
+    }
+
+    for (catto_Count i = 1; i <= CATTO_SQRT_ITERATIONS; i++) {
+        result -= ((result * result) - value) / (2 * result);
     }
 
     return result;
@@ -3833,6 +3851,12 @@ CATTO_FN_PREFIX void catto_command_remove(catto_Context* context) {
 
 // src/stdlib/functions.h
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(catto_sqrt(value));
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
     catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);
@@ -4053,6 +4077,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
 
     // Functions
 
+    catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
     catto_addFunction(context, "ceil", &catto_function_ceil);

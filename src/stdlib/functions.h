@@ -1,3 +1,9 @@
+catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
+    catto_Float value = catto_asNumber(catto_evalNextArg(context));
+
+    return catto_asTypedNumber(catto_sqrt(value));
+}
+
 catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
     catto_Int roundedValue = (catto_Int)(value < 0 ? value - 0.5 : value + 0.5);

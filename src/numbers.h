@@ -18,6 +18,21 @@ catto_Float catto_power(catto_Float base, catto_Int power) {
     return result;
 }
 
+// @source https://stackoverflow.com/a/49991852
+catto_Float catto_sqrt(catto_Float value) {
+    catto_Float result = 1;
+
+    if (value < 0) {
+        return CATTO_NAN;
+    }
+
+    for (catto_Count i = 1; i <= CATTO_SQRT_ITERATIONS; i++) {
+        result -= ((result * result) - value) / (2 * result);
+    }
+
+    return result;
+}
+
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
     catto_Bool isNegative = CATTO_FALSE;
 

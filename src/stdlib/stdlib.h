@@ -37,6 +37,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
 
     // Functions
 
+    catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
     catto_addFunction(context, "ceil", &catto_function_ceil);

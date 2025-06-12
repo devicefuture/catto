@@ -205,6 +205,7 @@ void catto_run(catto_Context* context);
 void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);
+catto_Float catto_sqrt(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
