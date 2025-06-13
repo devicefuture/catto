@@ -25,6 +25,13 @@ typedef enum {
     CATTO_MARK_SEARCH_LOOP_ONLY
 } catto_MarkSearchMode;
 
+typedef enum {
+    CATTO_TRIG_MODE_RADIANS,
+    CATTO_TRIG_MODE_DEGREES,
+    CATTO_TRIG_MODE_GRADIANS,
+    CATTO_TRIG_MODE_TURNS
+} catto_TrigMode;
+
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
@@ -44,6 +51,7 @@ typedef struct catto_Context {
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
     catto_Bool scrawlMode;
+    catto_TrigMode trigMode;
     void* userData;
 } catto_Context;
 
@@ -206,6 +214,11 @@ void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);
 catto_Float catto_sqrt(catto_Float value);
+catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode);
+catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);
+catto_Float catto_sin(catto_Float value);
+catto_Float catto_cos(catto_Float value);
+catto_Float catto_tan(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 

@@ -37,6 +37,14 @@ void catto_addContextStandardCommands(catto_Context* context) {
 
     // Functions
 
+    catto_addCommand(context, "deg", &catto_command_deg);
+    catto_addCommand(context, "rad", &catto_command_rad);
+    catto_addCommand(context, "gon", &catto_command_gon);
+    catto_addCommand(context, "turn", &catto_command_turn);
+
+    catto_addFunction(context, "sin", &catto_function_sin);
+    catto_addFunction(context, "cos", &catto_function_cos);
+    catto_addFunction(context, "tan", &catto_function_tan);
     catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
@@ -58,4 +66,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
 
     catto_setVariable(context, "true", catto_asTypedNumber(1));
     catto_setVariable(context, "false", catto_asTypedNumber(0));
+    catto_setVariable(context, "pi", catto_asTypedNumber(CATTO_PI));
+    catto_setVariable(context, "e", catto_asTypedNumber(CATTO_E));
+    catto_setVariable(context, "phi", catto_asTypedNumber(CATTO_PHI));
 }

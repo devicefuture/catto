@@ -33,6 +33,58 @@ catto_Float catto_sqrt(catto_Float value) {
     return result;
 }
 
+catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode) {
+    switch (trigMode) {
+        case CATTO_TRIG_MODE_RADIANS: return value;
+        case CATTO_TRIG_MODE_DEGREES: return value / (CATTO_PI / 180);
+        case CATTO_TRIG_MODE_GRADIANS: return value / (CATTO_PI / 200);
+        case CATTO_TRIG_MODE_TURNS: return value / (2 * CATTO_PI);
+    }
+
+    return value;
+}
+
+catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode) {
+    switch (trigMode) {
+        case CATTO_TRIG_MODE_RADIANS: return value;
+        case CATTO_TRIG_MODE_DEGREES: return value * (CATTO_PI / 180);
+        case CATTO_TRIG_MODE_GRADIANS: return value * (CATTO_PI / 200);
+        case CATTO_TRIG_MODE_TURNS: return value * (2 * CATTO_PI);
+    }
+
+    return value;
+}
+
+catto_Float catto_floatMod(catto_Float a, catto_Float b) {
+    catto_Float divisionResult = a / b;
+    catto_Float flooredResult = (catto_Int)(divisionResult < 0 ? divisionResult - 1 : divisionResult);
+
+    return a - (flooredResult * b);
+}
+
+catto_Float catto_sin(catto_Float value) {
+    return catto_cos(value - (CATTO_PI / 2));
+}
+
+// @source https://stackoverflow.com/a/2284969
+catto_Float catto_cos(catto_Float value) {
+    catto_Float partResult = 1;
+    catto_Float result = 1;
+
+    value = catto_floatMod(value, 2 * CATTO_PI);
+
+    for (catto_Count i = 1; i <= CATTO_COS_ITERATIONS; i++) {
+        partResult = (-partResult * value * value) / (((2 * i) - 1) * 2 * i);
+        result += partResult;
+    }
+
+    return catto_roundToPrecision(result, 14);
+}
+
+catto_Float catto_tan(catto_Float value) {
+    return catto_sin(value) / catto_cos(value);
+}
+
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
     catto_Bool isNegative = CATTO_FALSE;
 

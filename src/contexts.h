@@ -22,6 +22,7 @@ catto_Context* catto_newContext() {
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
+    context->trigMode = CATTO_TRIG_MODE_DEGREES;
 
     return context;
 }

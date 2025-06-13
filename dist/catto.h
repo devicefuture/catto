@@ -20,6 +20,7 @@
     #define CATTO_MAX_PRECISION 15
     #define CATTO_EPSILON 1E-15
     #define CATTO_SQRT_ITERATIONS 55
+    #define CATTO_COS_ITERATIONS 18
 #else
     #define CATTO_BOOL int32_t
     #define CATTO_COUNT uint32_t
@@ -30,6 +31,7 @@
     #define CATTO_MAX_PRECISION 6
     #define CATTO_EPSILON 1E-6
     #define CATTO_SQRT_ITERATIONS 27
+    #define CATTO_COS_ITERATIONS 10
 #endif
 
 #endif
@@ -92,6 +94,10 @@ typedef CATTO_FLOAT catto_Float;
 #define CATTO_NAN (0.0 / 0.0)
 #define CATTO_INFINITY (1.0 / 0.0)
 
+#define CATTO_PI 3.141592653589793
+#define CATTO_E 2.718281828459045
+#define CATTO_PHI 1.618033988798948
+
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
 
 // src/declarations.h
@@ -123,6 +129,13 @@ typedef enum {
     CATTO_MARK_SEARCH_LOOP_ONLY
 } catto_MarkSearchMode;
 
+typedef enum {
+    CATTO_TRIG_MODE_RADIANS,
+    CATTO_TRIG_MODE_DEGREES,
+    CATTO_TRIG_MODE_GRADIANS,
+    CATTO_TRIG_MODE_TURNS
+} catto_TrigMode;
+
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
@@ -142,6 +155,7 @@ typedef struct catto_Context {
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
     catto_Bool scrawlMode;
+    catto_TrigMode trigMode;
     void* userData;
 } catto_Context;
 
@@ -304,6 +318,11 @@ void catto_addContextStandardCommands(catto_Context* context);
 
 catto_Float catto_power(catto_Float base, catto_Int power);
 catto_Float catto_sqrt(catto_Float value);
+catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode);
+catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);
+catto_Float catto_sin(catto_Float value);
+catto_Float catto_cos(catto_Float value);
+catto_Float catto_tan(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
@@ -533,6 +552,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
+    context->trigMode = CATTO_TRIG_MODE_DEGREES;
 
     return context;
 }
@@ -1314,6 +1334,58 @@ CATTO_FN_PREFIX catto_Float catto_sqrt(catto_Float value) {
     }
 
     return result;
+}
+
+CATTO_FN_PREFIX catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode) {
+    switch (trigMode) {
+        case CATTO_TRIG_MODE_RADIANS: return value;
+        case CATTO_TRIG_MODE_DEGREES: return value / (CATTO_PI / 180);
+        case CATTO_TRIG_MODE_GRADIANS: return value / (CATTO_PI / 200);
+        case CATTO_TRIG_MODE_TURNS: return value / (2 * CATTO_PI);
+    }
+
+    return value;
+}
+
+CATTO_FN_PREFIX catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode) {
+    switch (trigMode) {
+        case CATTO_TRIG_MODE_RADIANS: return value;
+        case CATTO_TRIG_MODE_DEGREES: return value * (CATTO_PI / 180);
+        case CATTO_TRIG_MODE_GRADIANS: return value * (CATTO_PI / 200);
+        case CATTO_TRIG_MODE_TURNS: return value * (2 * CATTO_PI);
+    }
+
+    return value;
+}
+
+CATTO_FN_PREFIX catto_Float catto_floatMod(catto_Float a, catto_Float b) {
+    catto_Float divisionResult = a / b;
+    catto_Float flooredResult = (catto_Int)(divisionResult < 0 ? divisionResult - 1 : divisionResult);
+
+    return a - (flooredResult * b);
+}
+
+CATTO_FN_PREFIX catto_Float catto_sin(catto_Float value) {
+    return catto_cos(value - (CATTO_PI / 2));
+}
+
+// @source https://stackoverflow.com/a/2284969
+CATTO_FN_PREFIX catto_Float catto_cos(catto_Float value) {
+    catto_Float partResult = 1;
+    catto_Float result = 1;
+
+    value = catto_floatMod(value, 2 * CATTO_PI);
+
+    for (catto_Count i = 1; i <= CATTO_COS_ITERATIONS; i++) {
+        partResult = (-partResult * value * value) / (((2 * i) - 1) * 2 * i);
+        result += partResult;
+    }
+
+    return catto_roundToPrecision(result, 14);
+}
+
+CATTO_FN_PREFIX catto_Float catto_tan(catto_Float value) {
+    return catto_sin(value) / catto_cos(value);
 }
 
 CATTO_FN_PREFIX catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
@@ -3851,6 +3923,26 @@ CATTO_FN_PREFIX void catto_command_remove(catto_Context* context) {
 
 // src/stdlib/functions.h
 
+#define CATTO_TRIG_MODE_COMMAND(name, mode) CATTO_FN_PREFIX void name(catto_Context* context) { \
+        context->trigMode = mode; \
+    }
+
+#define CATTO_TRIG_FUNCTION(name, callName) CATTO_FN_PREFIX catto_TypedValue name(catto_Context* context, catto_DataType returnType) { \
+        catto_Float value = catto_asNumber(catto_evalNextArg(context)); \
+        catto_Float convertedValue = catto_toRadians(value, context->trigMode); \
+        \
+        return catto_asTypedNumber(callName(convertedValue)); \
+    }
+
+CATTO_TRIG_MODE_COMMAND(catto_command_deg, CATTO_TRIG_MODE_DEGREES);
+CATTO_TRIG_MODE_COMMAND(catto_command_rad, CATTO_TRIG_MODE_RADIANS);
+CATTO_TRIG_MODE_COMMAND(catto_command_gon, CATTO_TRIG_MODE_GRADIANS);
+CATTO_TRIG_MODE_COMMAND(catto_command_turn, CATTO_TRIG_MODE_TURNS);
+
+CATTO_TRIG_FUNCTION(catto_function_sin, catto_sin);
+CATTO_TRIG_FUNCTION(catto_function_cos, catto_cos);
+CATTO_TRIG_FUNCTION(catto_function_tan, catto_tan);
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
 
@@ -4077,6 +4169,14 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
 
     // Functions
 
+    catto_addCommand(context, "deg", &catto_command_deg);
+    catto_addCommand(context, "rad", &catto_command_rad);
+    catto_addCommand(context, "gon", &catto_command_gon);
+    catto_addCommand(context, "turn", &catto_command_turn);
+
+    catto_addFunction(context, "sin", &catto_function_sin);
+    catto_addFunction(context, "cos", &catto_function_cos);
+    catto_addFunction(context, "tan", &catto_function_tan);
     catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
@@ -4098,6 +4198,9 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
 
     catto_setVariable(context, "true", catto_asTypedNumber(1));
     catto_setVariable(context, "false", catto_asTypedNumber(0));
+    catto_setVariable(context, "pi", catto_asTypedNumber(CATTO_PI));
+    catto_setVariable(context, "e", catto_asTypedNumber(CATTO_E));
+    catto_setVariable(context, "phi", catto_asTypedNumber(CATTO_PHI));
 }
 
 #endif
