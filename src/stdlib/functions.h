@@ -9,6 +9,12 @@
         return catto_asTypedNumber(callName(convertedValue)); \
     }
 
+#define CATTO_TRIG_ARC_FUNCTION(name, callName) catto_TypedValue name(catto_Context* context, catto_DataType returnType) { \
+        catto_Float value = catto_asNumber(catto_evalNextArg(context)); \
+        \
+        return catto_asTypedNumber(catto_fromRadians(callName(value), context->trigMode)); \
+    }
+
 CATTO_TRIG_MODE_COMMAND(catto_command_deg, CATTO_TRIG_MODE_DEGREES);
 CATTO_TRIG_MODE_COMMAND(catto_command_rad, CATTO_TRIG_MODE_RADIANS);
 CATTO_TRIG_MODE_COMMAND(catto_command_gon, CATTO_TRIG_MODE_GRADIANS);
@@ -17,6 +23,8 @@ CATTO_TRIG_MODE_COMMAND(catto_command_turn, CATTO_TRIG_MODE_TURNS);
 CATTO_TRIG_FUNCTION(catto_function_sin, catto_sin);
 CATTO_TRIG_FUNCTION(catto_function_cos, catto_cos);
 CATTO_TRIG_FUNCTION(catto_function_tan, catto_tan);
+
+CATTO_TRIG_ARC_FUNCTION(catto_function_atan, catto_atan);
 
 catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
