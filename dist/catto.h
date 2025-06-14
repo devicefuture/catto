@@ -1418,7 +1418,7 @@ CATTO_FN_PREFIX catto_Float catto_atan(catto_Float value) {
 
     const catto_Count resultCount = sizeof(results) / sizeof(results[0]);
 
-    catto_Float result = 0;
+    catto_Float result = 90;
     catto_Bool negative = value < 0;
 
     if (negative) {
@@ -1440,13 +1440,6 @@ CATTO_FN_PREFIX catto_Float catto_atan(catto_Float value) {
 
     return result;
 }
-
-// catto_Float catto_atan(catto_Float value) {
-//     // catto_Float absValue = value < 0 ? -value : value;
-
-//     return 8 * value / (3 + catto_sqrt(25 + 80 / 3 * value * value));
-//     // return ((CATTO_PI / 4) * value) - (value * (absValue - 1) * (0.2447 + 0.663 * absValue));
-// }
 
 CATTO_FN_PREFIX catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
     catto_Bool isNegative = CATTO_FALSE;

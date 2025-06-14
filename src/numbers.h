@@ -115,7 +115,7 @@ catto_Float catto_atan(catto_Float value) {
 
     const catto_Count resultCount = sizeof(results) / sizeof(results[0]);
 
-    catto_Float result = 0;
+    catto_Float result = 90;
     catto_Bool negative = value < 0;
 
     if (negative) {
