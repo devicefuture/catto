@@ -24,6 +24,8 @@ CATTO_TRIG_FUNCTION(catto_function_sin, catto_sin);
 CATTO_TRIG_FUNCTION(catto_function_cos, catto_cos);
 CATTO_TRIG_FUNCTION(catto_function_tan, catto_tan);
 
+CATTO_TRIG_ARC_FUNCTION(catto_function_asin, catto_asin);
+CATTO_TRIG_ARC_FUNCTION(catto_function_acos, catto_acos);
 CATTO_TRIG_ARC_FUNCTION(catto_function_atan, catto_atan);
 
 catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {

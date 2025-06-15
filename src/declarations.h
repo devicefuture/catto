@@ -219,6 +219,9 @@ catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);
 catto_Float catto_sin(catto_Float value);
 catto_Float catto_cos(catto_Float value);
 catto_Float catto_tan(catto_Float value);
+catto_Float catto_asin(catto_Float value);
+catto_Float catto_acos(catto_Float value);
+catto_Float catto_atan(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 

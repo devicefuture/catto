@@ -85,6 +85,28 @@ catto_Float catto_tan(catto_Float value) {
     return catto_sin(value) / catto_cos(value);
 }
 
+catto_Float catto_asin(catto_Float value) {
+    if (value < -1 || value > 1) {
+        return CATTO_NAN;
+    }
+
+    return catto_atan(value / catto_sqrt(1 - (value * value)));
+}
+
+catto_Float catto_acos(catto_Float value) {
+    if (value < -1 || value > 1) {
+        return CATTO_NAN;
+    }
+
+    if (value == -1) {
+        return CATTO_PI;
+    }
+
+    catto_Float result = catto_atan(catto_sqrt(1 - (value * value)) / value);
+
+    return result < 0 ? result + CATTO_PI : result;
+}
+
 catto_Float catto_atan(catto_Float value) {
     const catto_Float results[] = {
         0,

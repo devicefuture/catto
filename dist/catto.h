@@ -323,6 +323,9 @@ catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);
 catto_Float catto_sin(catto_Float value);
 catto_Float catto_cos(catto_Float value);
 catto_Float catto_tan(catto_Float value);
+catto_Float catto_asin(catto_Float value);
+catto_Float catto_acos(catto_Float value);
+catto_Float catto_atan(catto_Float value);
 catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision);
 catto_Char* catto_numberToString(catto_Float number);
 
@@ -1386,6 +1389,28 @@ CATTO_FN_PREFIX catto_Float catto_cos(catto_Float value) {
 
 CATTO_FN_PREFIX catto_Float catto_tan(catto_Float value) {
     return catto_sin(value) / catto_cos(value);
+}
+
+CATTO_FN_PREFIX catto_Float catto_asin(catto_Float value) {
+    if (value < -1 || value > 1) {
+        return CATTO_NAN;
+    }
+
+    return catto_atan(value / catto_sqrt(1 - (value * value)));
+}
+
+CATTO_FN_PREFIX catto_Float catto_acos(catto_Float value) {
+    if (value < -1 || value > 1) {
+        return CATTO_NAN;
+    }
+
+    if (value == -1) {
+        return CATTO_PI;
+    }
+
+    catto_Float result = catto_atan(catto_sqrt(1 - (value * value)) / value);
+
+    return result < 0 ? result + CATTO_PI : result;
 }
 
 CATTO_FN_PREFIX catto_Float catto_atan(catto_Float value) {
@@ -4002,6 +4027,8 @@ CATTO_TRIG_FUNCTION(catto_function_sin, catto_sin);
 CATTO_TRIG_FUNCTION(catto_function_cos, catto_cos);
 CATTO_TRIG_FUNCTION(catto_function_tan, catto_tan);
 
+CATTO_TRIG_ARC_FUNCTION(catto_function_asin, catto_asin);
+CATTO_TRIG_ARC_FUNCTION(catto_function_acos, catto_acos);
 CATTO_TRIG_ARC_FUNCTION(catto_function_atan, catto_atan);
 
 CATTO_FN_PREFIX catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
@@ -4238,6 +4265,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "sin", &catto_function_sin);
     catto_addFunction(context, "cos", &catto_function_cos);
     catto_addFunction(context, "tan", &catto_function_tan);
+    catto_addFunction(context, "asin", &catto_function_asin);
+    catto_addFunction(context, "acos", &catto_function_acos);
     catto_addFunction(context, "atan", &catto_function_atan);
     catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
