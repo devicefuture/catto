@@ -179,9 +179,13 @@ void inputCommand(catto_Context* context) {
 }
 
 void delayCommand(catto_Context* context) {
-    uint64_t delay = catto_asNumber(catto_evalNextArg(context));
+    int64_t delay = catto_asNumber(catto_evalNextArg(context));
 
     uint64_t startTime = getEpoch();
+
+    if (delay < 0) {
+        return;
+    }
 
     while (getEpoch() - startTime < delay) {
         if (getchar() == '\e') { // Escape
@@ -190,6 +194,25 @@ void delayCommand(catto_Context* context) {
             break;
         }
     }
+}
+
+void clsCommand(catto_Context* context) {
+    printf("\033[2J\033[H");
+}
+
+void posCommand(catto_Context* context) {
+    int64_t column = catto_asNumber(catto_evalNextArg(context));
+    int64_t row = catto_asNumber(catto_evalNextArg(context));
+
+    if (column < 0) {
+        column = 0;
+    }
+
+    if (row < 0) {
+        row = 0;
+    }
+
+    printf("\033[%d;%dH", row, column);
 }
 
 catto_TypedValue epochFunction(catto_Context* context, catto_DataType returnType) {
@@ -214,6 +237,8 @@ int main(int argc, char* argv[]) {
     catto_addContextStandardCommands(context);
     catto_addCommand(context, "input", &inputCommand);
     catto_addCommand(context, "delay", &delayCommand);
+    catto_addCommand(context, "cls", &clsCommand);
+    catto_addCommand(context, "pos", &posCommand);
     catto_addFunction(context, "epoch", &epochFunction);
 
     if (argc >= 2) {
