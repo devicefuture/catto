@@ -316,7 +316,11 @@ void catto_run(catto_Context* context);
 
 void catto_addContextStandardCommands(catto_Context* context);
 
-catto_Float catto_power(catto_Float base, catto_Int power);
+catto_Float catto_ln(catto_Float value);
+catto_Float catto_log(catto_Float value);
+catto_Float catto_log2(catto_Float value);
+catto_Float catto_exp2(catto_Float value);
+catto_Float catto_power(catto_Float base, catto_Float power);
 catto_Float catto_sqrt(catto_Float value);
 catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode);
 catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);
@@ -459,7 +463,7 @@ CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_and, &&);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_or, ||);
 
 CATTO_FN_PREFIX catto_TypedValue catto_binary_power(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
-    return catto_asTypedNumber(catto_power(catto_asNumber(a), (catto_Int)catto_asNumber(b)));
+    return catto_asTypedNumber(catto_power(catto_asNumber(a), catto_asNumber(b)));
 }
 
 CATTO_FN_PREFIX catto_TypedValue catto_binary_xor(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
@@ -1304,7 +1308,47 @@ CATTO_FN_PREFIX void catto_run(catto_Context* context) {
 
 // src/numbers.h
 
-CATTO_FN_PREFIX catto_Float catto_power(catto_Float base, catto_Int power) {
+// @source https://stackoverflow.com/a/77133316
+// TODO: Replace with better approximation
+CATTO_FN_PREFIX catto_Float catto_ln(catto_Float value) {
+    if (value < 0) {
+        return CATTO_NAN;
+    }
+
+    if (value < 0.5) {
+        return -catto_ln(1.0 / value);
+    }
+
+    catto_Float multiplier = (value - 1) / (value + 1);
+    catto_Float result = 0;
+    catto_Float term = multiplier;
+
+    for (catto_Count i = 1; i <= 100; i += 2) {
+        result += term / i;
+        term *= multiplier * multiplier;
+    }
+
+    return result * 2.0;
+}
+
+CATTO_FN_PREFIX catto_Float catto_log(catto_Float value) {
+    return catto_ln(value) / 2.3025850929940457;
+}
+
+CATTO_FN_PREFIX catto_Float catto_log2(catto_Float value) {
+    return catto_ln(value) / 0.6931471805599453;
+}
+
+// @source https://math.stackexchange.com/a/4581483
+CATTO_FN_PREFIX catto_Float catto_exp2(catto_Float value) {
+    catto_Int integralPart = value;
+    catto_Float fractionalPart = value - integralPart;
+    catto_Float multiplier = 1.0 + (27.704226690769845416 / (4.8416702244134115171 - fractionalPart)) - (0.48942480030516666506 * fractionalPart) - 5.7220391320516093836;
+
+    return (catto_Float)(1 << integralPart) * multiplier;
+}
+
+CATTO_FN_PREFIX catto_Float catto_power(catto_Float base, catto_Float power) {
     if (power == 0) {
         return 1;
     }
@@ -1313,6 +1357,10 @@ CATTO_FN_PREFIX catto_Float catto_power(catto_Float base, catto_Int power) {
         base = 1 / base;
         power *= -1;
     }
+
+    if (power != (catto_Int)power) {
+        return catto_exp2(power * catto_log2(base));
+    }   
 
     catto_Float result = base;
 
@@ -1490,7 +1538,7 @@ CATTO_FN_PREFIX catto_Float catto_roundToPrecision(catto_Float number, catto_Cou
 
     catto_Int multiplier = catto_power(10, precision);
 
-    number += 0.5 * catto_power(10, -precision);
+    number += 0.5 * catto_power(10, -(catto_Int)precision);
 
     if (isNegative) {
         number *= -1;
@@ -1539,7 +1587,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
 
     catto_Int integralPart = number;
 
-    number += 0.1 * catto_power(10, -precisionLeft);
+    number += 0.1 * catto_power(10, -(catto_Int)precisionLeft);
     number -= integralPart; // Now fractional part
 
     do {
@@ -4005,6 +4053,12 @@ CATTO_FN_PREFIX void catto_command_remove(catto_Context* context) {
         context->trigMode = mode; \
     }
 
+#define CATTO_UNARY_NUMERIC_FUNCTION(name, callName) CATTO_FN_PREFIX catto_TypedValue name(catto_Context* context, catto_DataType returnType) { \
+        catto_Float value = catto_asNumber(catto_evalNextArg(context)); \
+        \
+        return catto_asTypedNumber(callName(value)); \
+    }
+
 #define CATTO_TRIG_FUNCTION(name, callName) CATTO_FN_PREFIX catto_TypedValue name(catto_Context* context, catto_DataType returnType) { \
         catto_Float value = catto_asNumber(catto_evalNextArg(context)); \
         catto_Float convertedValue = catto_toRadians(value, context->trigMode); \
@@ -4031,11 +4085,9 @@ CATTO_TRIG_ARC_FUNCTION(catto_function_asin, catto_asin);
 CATTO_TRIG_ARC_FUNCTION(catto_function_acos, catto_acos);
 CATTO_TRIG_ARC_FUNCTION(catto_function_atan, catto_atan);
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_sqrt(catto_Context* context, catto_DataType returnType) {
-    catto_Float value = catto_asNumber(catto_evalNextArg(context));
-
-    return catto_asTypedNumber(catto_sqrt(value));
-}
+CATTO_UNARY_NUMERIC_FUNCTION(catto_function_log, catto_log);
+CATTO_UNARY_NUMERIC_FUNCTION(catto_function_ln, catto_ln);
+CATTO_UNARY_NUMERIC_FUNCTION(catto_function_sqrt, catto_sqrt);
 
 CATTO_FN_PREFIX catto_TypedValue catto_function_round(catto_Context* context, catto_DataType returnType) {
     catto_Float value = catto_asNumber(catto_evalNextArg(context));
@@ -4268,6 +4320,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "asin", &catto_function_asin);
     catto_addFunction(context, "acos", &catto_function_acos);
     catto_addFunction(context, "atan", &catto_function_atan);
+    catto_addFunction(context, "log", &catto_function_log);
+    catto_addFunction(context, "ln", &catto_function_ln);
     catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);

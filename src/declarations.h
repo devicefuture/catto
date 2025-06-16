@@ -212,7 +212,11 @@ void catto_run(catto_Context* context);
 
 void catto_addContextStandardCommands(catto_Context* context);
 
-catto_Float catto_power(catto_Float base, catto_Int power);
+catto_Float catto_ln(catto_Float value);
+catto_Float catto_log(catto_Float value);
+catto_Float catto_log2(catto_Float value);
+catto_Float catto_exp2(catto_Float value);
+catto_Float catto_power(catto_Float base, catto_Float power);
 catto_Float catto_sqrt(catto_Float value);
 catto_Float catto_fromRadians(catto_Float value, catto_TrigMode trigMode);
 catto_Float catto_toRadians(catto_Float value, catto_TrigMode trigMode);

@@ -73,7 +73,7 @@ CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_and, &&);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_or, ||);
 
 catto_TypedValue catto_binary_power(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
-    return catto_asTypedNumber(catto_power(catto_asNumber(a), (catto_Int)catto_asNumber(b)));
+    return catto_asTypedNumber(catto_power(catto_asNumber(a), catto_asNumber(b)));
 }
 
 catto_TypedValue catto_binary_xor(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {

@@ -1,4 +1,44 @@
-catto_Float catto_power(catto_Float base, catto_Int power) {
+// @source https://stackoverflow.com/a/77133316
+// TODO: Replace with better approximation
+catto_Float catto_ln(catto_Float value) {
+    if (value < 0) {
+        return CATTO_NAN;
+    }
+
+    if (value < 0.5) {
+        return -catto_ln(1.0 / value);
+    }
+
+    catto_Float multiplier = (value - 1) / (value + 1);
+    catto_Float result = 0;
+    catto_Float term = multiplier;
+
+    for (catto_Count i = 1; i <= 100; i += 2) {
+        result += term / i;
+        term *= multiplier * multiplier;
+    }
+
+    return result * 2.0;
+}
+
+catto_Float catto_log(catto_Float value) {
+    return catto_ln(value) / 2.3025850929940457;
+}
+
+catto_Float catto_log2(catto_Float value) {
+    return catto_ln(value) / 0.6931471805599453;
+}
+
+// @source https://math.stackexchange.com/a/4581483
+catto_Float catto_exp2(catto_Float value) {
+    catto_Int integralPart = value;
+    catto_Float fractionalPart = value - integralPart;
+    catto_Float multiplier = 1.0 + (27.704226690769845416 / (4.8416702244134115171 - fractionalPart)) - (0.48942480030516666506 * fractionalPart) - 5.7220391320516093836;
+
+    return (catto_Float)(1 << integralPart) * multiplier;
+}
+
+catto_Float catto_power(catto_Float base, catto_Float power) {
     if (power == 0) {
         return 1;
     }
@@ -7,6 +47,10 @@ catto_Float catto_power(catto_Float base, catto_Int power) {
         base = 1 / base;
         power *= -1;
     }
+
+    if (power != (catto_Int)power) {
+        return catto_exp2(power * catto_log2(base));
+    }   
 
     catto_Float result = base;
 
@@ -184,7 +228,7 @@ catto_Float catto_roundToPrecision(catto_Float number, catto_Count precision) {
 
     catto_Int multiplier = catto_power(10, precision);
 
-    number += 0.5 * catto_power(10, -precision);
+    number += 0.5 * catto_power(10, -(catto_Int)precision);
 
     if (isNegative) {
         number *= -1;
@@ -233,7 +277,7 @@ catto_Char* catto_numberToString(catto_Float number) {
 
     catto_Int integralPart = number;
 
-    number += 0.1 * catto_power(10, -precisionLeft);
+    number += 0.1 * catto_power(10, -(catto_Int)precisionLeft);
     number -= integralPart; // Now fractional part
 
     do {

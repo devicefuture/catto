@@ -48,6 +48,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "asin", &catto_function_asin);
     catto_addFunction(context, "acos", &catto_function_acos);
     catto_addFunction(context, "atan", &catto_function_atan);
+    catto_addFunction(context, "log", &catto_function_log);
+    catto_addFunction(context, "ln", &catto_function_ln);
     catto_addFunction(context, "sqrt", &catto_function_sqrt);
     catto_addFunction(context, "round", &catto_function_round);
     catto_addFunction(context, "floor", &catto_function_floor);
