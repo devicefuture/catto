@@ -14,6 +14,8 @@
 
     #define CATTO_MAX_PRECISION 15
     #define CATTO_EPSILON 1E-15
+    #define CATTO_LOG2_ITERATIONS 47
+    #define CATTO_EXP2_ITERATIONS 12
     #define CATTO_SQRT_ITERATIONS 55
     #define CATTO_COS_ITERATIONS 18
 #else
@@ -25,6 +27,8 @@
 
     #define CATTO_MAX_PRECISION 6
     #define CATTO_EPSILON 1E-6
+    #define CATTO_LOG2_ITERATIONS 47
+    #define CATTO_EXP2_ITERATIONS 12
     #define CATTO_SQRT_ITERATIONS 27
     #define CATTO_COS_ITERATIONS 10
 #endif

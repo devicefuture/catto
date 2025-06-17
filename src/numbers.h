@@ -1,41 +1,73 @@
-// @source https://stackoverflow.com/a/77133316
-// TODO: Replace with better approximation
-catto_Float catto_ln(catto_Float value) {
-    if (value < 0) {
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_LOG2_EXPONENT_SHIFT 52
+    #define CATTO_LOG2_EXPONENT_BIAS 1023
+    #define CATTO_LOG2_EXPONENT_MASK 0x7FF
+    #define CATTO_LOG2_MANTISSA_MASK 0xFFFFFFFFFFFFF
+#else
+    #define CATTO_LOG2_EXPONENT_SHIFT 23
+    #define CATTO_LOG2_EXPONENT_BIAS 127
+    #define CATTO_LOG2_EXPONENT_MASK 0xFF
+    #define CATTO_LOG2_MANTISSA_MASK 0x7FFFFF
+#endif
+
+catto_Float catto_log2(catto_Float value) {
+    if (value <= 0) {
         return CATTO_NAN;
     }
 
-    if (value < 0.5) {
-        return -catto_ln(1.0 / value);
+    if (value < 1) {
+        return -catto_log2(1 / value);
     }
 
-    catto_Float multiplier = (value - 1) / (value + 1);
-    catto_Float result = 0;
-    catto_Float term = multiplier;
+    union {
+        catto_Float asFloat;
+        catto_Count asCount;
+    } converter;
+    
+    converter.asFloat = value;
 
-    for (catto_Count i = 1; i <= 100; i += 2) {
-        result += term / i;
-        term *= multiplier * multiplier;
+   catto_Count exponent = (converter.asCount >> CATTO_LOG2_EXPONENT_SHIFT) & CATTO_LOG2_EXPONENT_MASK;
+   catto_Count mantissa = converter.asCount & CATTO_LOG2_MANTISSA_MASK;
+    
+    // Exponent is stored as biased, so subtract that bias
+    catto_Count biasedExponent = exponent - CATTO_LOG2_EXPONENT_BIAS;
+
+    catto_Float mantissaValue = ((catto_Float)mantissa / (1ULL << CATTO_LOG2_EXPONENT_SHIFT));
+    catto_Float mantissaResult = 0;
+    catto_Float mantissaPartResult = mantissaValue;
+
+    for (catto_Count i = 1; i <= CATTO_LOG2_ITERATIONS; i++) {
+        catto_Float coefficient = (i % 2 == 1) ? 1 : -1;
+        
+        mantissaResult += coefficient * mantissaPartResult / i;
+        mantissaPartResult *= mantissaValue;
     }
 
-    return result * 2.0;
+    mantissaResult *= 1.4426950408889634;
+    
+    return biasedExponent + mantissaResult;
 }
 
 catto_Float catto_log(catto_Float value) {
-    return catto_ln(value) / 2.3025850929940457;
+    return catto_roundToPrecision(catto_log2(value) / 3.3219280948873623, 4);
 }
 
-catto_Float catto_log2(catto_Float value) {
-    return catto_ln(value) / 0.6931471805599453;
+catto_Float catto_ln(catto_Float value) {
+    return catto_log2(value) / 1.4426950408889634;
 }
 
-// @source https://math.stackexchange.com/a/4581483
 catto_Float catto_exp2(catto_Float value) {
-    catto_Int integralPart = value;
-    catto_Float fractionalPart = value - integralPart;
-    catto_Float multiplier = 1.0 + (27.704226690769845416 / (4.8416702244134115171 - fractionalPart)) - (0.48942480030516666506 * fractionalPart) - 5.7220391320516093836;
+    value *= 0.6931471805599453;
 
-    return (catto_Float)(1 << integralPart) * multiplier;
+    catto_Float partResult = 1;
+    catto_Float result = 1;
+
+    for (catto_Count i = 1; i <= CATTO_EXP2_ITERATIONS; i++) {
+        partResult *= value / i;
+        result += partResult;
+    }
+
+    return result;
 }
 
 catto_Float catto_power(catto_Float base, catto_Float power) {
