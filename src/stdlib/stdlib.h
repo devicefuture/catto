@@ -64,6 +64,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "hex", &catto_function_hex);
     catto_addFunction(context, "len", &catto_function_len);
     catto_addFunction(context, "last", &catto_function_last);
+    catto_addFunction(context, "find", &catto_function_find);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
 

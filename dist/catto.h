@@ -4262,6 +4262,41 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, cat
     return returnValue;
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue sequence = catto_evalNextArg(context);
+    catto_TypedValue searchValue = catto_evalNextArg(context);
+
+    if (sequence.type == CATTO_DATA_TYPE_LIST) {
+        catto_List* list = sequence.value.asList;
+
+        for (catto_Count i = 0; i < list->length; i++) {
+            catto_TypedValue item = list->values[i];
+
+            if (catto_asNumber(catto_binary_equal(context, item, searchValue))) {
+                return catto_asTypedNumber(i);
+            }
+        }
+
+        return catto_asTypedNumber(-1);
+    }
+
+    catto_Char* string = catto_asString(sequence);
+    catto_Char* searchString = catto_asString(searchValue);
+    catto_Int index = -1;
+
+    for (catto_Count i = 0; i < catto_stringLength(string); i++) {
+        if (catto_stringStartsWith(string + i, searchString)) {
+            index = i;
+            break;
+        }
+    }
+
+    CATTO_FREE(string);
+    CATTO_FREE(searchString);
+
+    return catto_asTypedNumber(index);
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_lower(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Char* currentChar = value;
@@ -4372,6 +4407,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "hex", &catto_function_hex);
     catto_addFunction(context, "len", &catto_function_len);
     catto_addFunction(context, "last", &catto_function_last);
+    catto_addFunction(context, "find", &catto_function_find);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
 
