@@ -155,6 +155,7 @@ typedef struct catto_Context {
     struct catto_AstNode** statementStack;
     catto_Count statementStackCount;
     void** pointersToGc;
+    catto_DataType* pointerTypesToGc;
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
@@ -294,7 +295,7 @@ typedef struct catto_OperatorMapping {
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
-void catto_addPointerToGc(catto_Context* context, void* ptr);
+void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
@@ -352,7 +353,8 @@ catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base,
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
-void catto_destroyList(catto_Context* context, catto_List* list);
+void catto_dereferenceList(catto_Context* context, catto_List* list);
+void catto_freeList(catto_Context* context, catto_List* list);
 void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
@@ -501,7 +503,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_binary_concat(catto_Context* context, cat
     CATTO_FREE(aString);
     CATTO_FREE(bString);
 
-    catto_addPointerToGc(context, resultString);
+    catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString);
 
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
@@ -610,14 +612,20 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
 
     CATTO_FREE(context->statementStack);
     CATTO_FREE(context->pointersToGc);
+    CATTO_FREE(context->pointerTypesToGc);
     CATTO_FREE(context);
 }
 
-CATTO_FN_PREFIX void catto_addPointerToGc(catto_Context* context, void* ptr) {
+CATTO_FN_PREFIX void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 
-    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * context->pointersToGcCount + 1);
-    context->pointersToGc[context->pointersToGcCount++] = ptr;
+    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * (context->pointersToGcCount + 1));
+    context->pointersToGc[context->pointersToGcCount] = ptr;
+
+    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, sizeof(catto_DataType) * (context->pointersToGcCount + 1));
+    context->pointerTypesToGc[context->pointersToGcCount] = type;
+
+    context->pointersToGcCount++;
 }
 
 CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr) {
@@ -627,7 +635,7 @@ CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointersToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_NULL;
         }
     }
 }
@@ -639,13 +647,27 @@ CATTO_FN_PREFIX void catto_gc(catto_Context* context) {
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         void* ptr = context->pointersToGc[i];
+        catto_DataType type = context->pointerTypesToGc[i];
 
-        if (ptr) {
+        if (!ptr) {
+            continue;
+        }
+
+        if (type == CATTO_DATA_TYPE_LIST) {
+            catto_List* list = (catto_List*)ptr;
+
+            if (list->referenceCount > 0) {
+                continue;
+            }
+
+            catto_freeList(context, list);
+        } else {
             CATTO_FREE(ptr);
         }
     }
 
     context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, 0);
+    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, 0);
     context->pointersToGcCount = 0;
 }
 
@@ -2073,19 +2095,23 @@ CATTO_FN_PREFIX catto_List* catto_referenceList(catto_List* list) {
     return list;
 }
 
-CATTO_FN_PREFIX void catto_destroyList(catto_Context* context, catto_List* list) {
+CATTO_FN_PREFIX void catto_dereferenceList(catto_Context* context, catto_List* list) {
     if (list->referenceCount > 0) {
         list->referenceCount--;
     }
 
     if (list->referenceCount == 0) {
-        for (catto_Count i = 0; i < list->length; i++) {
-            catto_addTypedValueToGc(context, list->values[i]);
-        }
-
-        CATTO_FREE(list->values);
-        CATTO_FREE(list);
+        catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list);
     }
+}
+
+CATTO_FN_PREFIX void catto_freeList(catto_Context* context, catto_List* list) {
+    for (catto_Count i = 0; i < list->length; i++) {
+        catto_addTypedValueToGc(context, list->values[i]);
+    }
+
+    CATTO_FREE(list->values);
+    CATTO_FREE(list);
 }
 
 CATTO_FN_PREFIX void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
@@ -2287,11 +2313,11 @@ CATTO_FN_PREFIX catto_TypedValue catto_castTypedValue(catto_TypedValue value, ca
 
 CATTO_FN_PREFIX void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        catto_addPointerToGc(context, value.value.asString);
+        catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString);
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        catto_destroyList(context, value.value.asList);
+        catto_dereferenceList(context, value.value.asList);
     }
 }
 
@@ -4262,6 +4288,62 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, cat
     return returnValue;
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
+    catto_Char* string = catto_asString(catto_evalNextArg(context));
+    catto_Char* delimeter = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString("");
+    catto_Count delimeterLength = catto_stringLength(delimeter);
+    catto_List* list = catto_newList();
+    catto_Char* currentString = catto_copyString("");
+
+    catto_Count i = 0;
+
+    while (CATTO_TRUE) {
+        if (!string[i]) {
+            goto splitHere;
+        }
+        
+        if (delimeterLength > 0 && catto_stringStartsWith(string + i, delimeter)) {
+            goto splitHere;
+        }
+
+        currentString = catto_appendCharToString(currentString, string[i]);
+
+        i++;
+
+        if (delimeterLength > 0) {
+            continue;
+        }
+
+        splitHere:
+
+        catto_TypedValue typedString = catto_asTypedString(currentString);
+
+        catto_pushOntoList(list, typedString);
+        catto_addTypedValueToGc(context, typedString);
+
+        CATTO_FREE(currentString);
+
+        currentString = catto_copyString("");
+
+        if (!string[i]) {
+            break;
+        }
+
+        i += delimeterLength;
+
+        continue;
+    }
+
+    CATTO_FREE(string);
+    CATTO_FREE(delimeter);
+    CATTO_FREE(currentString);
+
+    return (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_LIST,
+        .value = {.asList = list}
+    };
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
     catto_TypedValue searchValue = catto_evalNextArg(context);
@@ -4407,6 +4489,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "hex", &catto_function_hex);
     catto_addFunction(context, "len", &catto_function_len);
     catto_addFunction(context, "last", &catto_function_last);
+    catto_addFunction(context, "split", &catto_function_split);
     catto_addFunction(context, "find", &catto_function_find);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);

@@ -69,14 +69,20 @@ void catto_freeContext(catto_Context* context) {
 
     CATTO_FREE(context->statementStack);
     CATTO_FREE(context->pointersToGc);
+    CATTO_FREE(context->pointerTypesToGc);
     CATTO_FREE(context);
 }
 
-void catto_addPointerToGc(catto_Context* context, void* ptr) {
+void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 
-    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * context->pointersToGcCount + 1);
-    context->pointersToGc[context->pointersToGcCount++] = ptr;
+    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * (context->pointersToGcCount + 1));
+    context->pointersToGc[context->pointersToGcCount] = ptr;
+
+    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, sizeof(catto_DataType) * (context->pointersToGcCount + 1));
+    context->pointerTypesToGc[context->pointersToGcCount] = type;
+
+    context->pointersToGcCount++;
 }
 
 void catto_removePointerFromGc(catto_Context* context, void* ptr) {
@@ -86,7 +92,7 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr) {
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointersToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_NULL;
         }
     }
 }
@@ -98,13 +104,27 @@ void catto_gc(catto_Context* context) {
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         void* ptr = context->pointersToGc[i];
+        catto_DataType type = context->pointerTypesToGc[i];
 
-        if (ptr) {
+        if (!ptr) {
+            continue;
+        }
+
+        if (type == CATTO_DATA_TYPE_LIST) {
+            catto_List* list = (catto_List*)ptr;
+
+            if (list->referenceCount > 0) {
+                continue;
+            }
+
+            catto_freeList(context, list);
+        } else {
             CATTO_FREE(ptr);
         }
     }
 
     context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, 0);
+    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, 0);
     context->pointersToGcCount = 0;
 }
 

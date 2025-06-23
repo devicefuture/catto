@@ -107,7 +107,7 @@ catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a,
     CATTO_FREE(aString);
     CATTO_FREE(bString);
 
-    catto_addPointerToGc(context, resultString);
+    catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString);
 
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,

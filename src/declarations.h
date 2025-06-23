@@ -47,6 +47,7 @@ typedef struct catto_Context {
     struct catto_AstNode** statementStack;
     catto_Count statementStackCount;
     void** pointersToGc;
+    catto_DataType* pointerTypesToGc;
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
@@ -186,7 +187,7 @@ typedef struct catto_OperatorMapping {
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
-void catto_addPointerToGc(catto_Context* context, void* ptr);
+void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
@@ -244,7 +245,8 @@ catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base,
 
 catto_List* catto_newList();
 catto_List* catto_referenceList(catto_List* list);
-void catto_destroyList(catto_Context* context, catto_List* list);
+void catto_dereferenceList(catto_Context* context, catto_List* list);
+void catto_freeList(catto_Context* context, catto_List* list);
 void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);

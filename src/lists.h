@@ -14,19 +14,23 @@ catto_List* catto_referenceList(catto_List* list) {
     return list;
 }
 
-void catto_destroyList(catto_Context* context, catto_List* list) {
+void catto_dereferenceList(catto_Context* context, catto_List* list) {
     if (list->referenceCount > 0) {
         list->referenceCount--;
     }
 
     if (list->referenceCount == 0) {
-        for (catto_Count i = 0; i < list->length; i++) {
-            catto_addTypedValueToGc(context, list->values[i]);
-        }
-
-        CATTO_FREE(list->values);
-        CATTO_FREE(list);
+        catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list);
     }
+}
+
+void catto_freeList(catto_Context* context, catto_List* list) {
+    for (catto_Count i = 0; i < list->length; i++) {
+        catto_addTypedValueToGc(context, list->values[i]);
+    }
+
+    CATTO_FREE(list->values);
+    CATTO_FREE(list);
 }
 
 void catto_pushOntoList(catto_List* list, catto_TypedValue value) {

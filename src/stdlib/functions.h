@@ -175,6 +175,62 @@ catto_TypedValue catto_function_last(catto_Context* context, catto_DataType retu
     return returnValue;
 }
 
+catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
+    catto_Char* string = catto_asString(catto_evalNextArg(context));
+    catto_Char* delimeter = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString("");
+    catto_Count delimeterLength = catto_stringLength(delimeter);
+    catto_List* list = catto_newList();
+    catto_Char* currentString = catto_copyString("");
+
+    catto_Count i = 0;
+
+    while (CATTO_TRUE) {
+        if (!string[i]) {
+            goto splitHere;
+        }
+        
+        if (delimeterLength > 0 && catto_stringStartsWith(string + i, delimeter)) {
+            goto splitHere;
+        }
+
+        currentString = catto_appendCharToString(currentString, string[i]);
+
+        i++;
+
+        if (delimeterLength > 0) {
+            continue;
+        }
+
+        splitHere:
+
+        catto_TypedValue typedString = catto_asTypedString(currentString);
+
+        catto_pushOntoList(list, typedString);
+        catto_addTypedValueToGc(context, typedString);
+
+        CATTO_FREE(currentString);
+
+        currentString = catto_copyString("");
+
+        if (!string[i]) {
+            break;
+        }
+
+        i += delimeterLength;
+
+        continue;
+    }
+
+    CATTO_FREE(string);
+    CATTO_FREE(delimeter);
+    CATTO_FREE(currentString);
+
+    return (catto_TypedValue) {
+        .type = CATTO_DATA_TYPE_LIST,
+        .value = {.asList = list}
+    };
+}
+
 catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
     catto_TypedValue searchValue = catto_evalNextArg(context);

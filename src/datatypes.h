@@ -98,11 +98,11 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
 
 void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        catto_addPointerToGc(context, value.value.asString);
+        catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString);
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        catto_destroyList(context, value.value.asList);
+        catto_dereferenceList(context, value.value.asList);
     }
 }
 
