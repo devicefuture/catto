@@ -4218,8 +4218,6 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catt
 
     CATTO_FREE(string);
 
-    catto_addTypedValueToGc(context, returnValue);
-
     return returnValue;
 }
 
@@ -4230,8 +4228,6 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_base(catto_Context* context, cat
         catto_TypedValue returnValue = catto_asTypedString(string);
 
         CATTO_FREE(string);
-
-        catto_addTypedValueToGc(context, returnValue);
 
         return returnValue;
     }
@@ -4282,8 +4278,6 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, cat
     }
 
     catto_TypedValue returnValue = catto_copyTypedValue(list->values[list->length - 1]);
-
-    catto_addTypedValueToGc(context, returnValue);
 
     return returnValue;
 }
@@ -4344,6 +4338,38 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
     };
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_join(catto_Context* context, catto_DataType returnType) {
+    catto_TypedValue value = catto_evalNextArg(context);
+
+    if (value.type != CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedString("");
+    }
+
+    catto_List* list = value.value.asList;
+    catto_Char* resultString = catto_copyString("");
+    catto_Char* delimeter = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString("");
+    catto_Count delimeterLength = catto_stringLength(delimeter);
+
+    for (catto_Count i = 0; i < list->length; i++) {
+        catto_Char* partString = catto_asString(list->values[i]);
+
+        if (i > 0 && delimeterLength > 0) {
+            resultString = catto_appendToString(resultString, delimeter);
+        }
+
+        resultString = catto_appendToString(resultString, partString);
+
+        CATTO_FREE(partString);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(resultString);
+
+    CATTO_FREE(resultString);
+    CATTO_FREE(delimeter);
+
+    return returnValue;
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
     catto_TypedValue searchValue = catto_evalNextArg(context);
@@ -4395,8 +4421,6 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_lower(catto_Context* context, ca
 
     CATTO_FREE(value);
 
-    catto_addTypedValueToGc(context, returnValue);
-
     return returnValue;
 }
 
@@ -4415,8 +4439,6 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_upper(catto_Context* context, ca
     catto_TypedValue returnValue = catto_asTypedString(value);
 
     CATTO_FREE(value);
-
-    catto_addTypedValueToGc(context, returnValue);
 
     return returnValue;
 }
@@ -4490,6 +4512,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "len", &catto_function_len);
     catto_addFunction(context, "last", &catto_function_last);
     catto_addFunction(context, "split", &catto_function_split);
+    catto_addFunction(context, "join", &catto_function_join);
     catto_addFunction(context, "find", &catto_function_find);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
