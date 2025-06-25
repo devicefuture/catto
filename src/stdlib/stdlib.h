@@ -69,6 +69,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "find", &catto_function_find);
     catto_addFunction(context, "lower", &catto_function_lower);
     catto_addFunction(context, "upper", &catto_function_upper);
+    catto_addFunction(context, "left", &catto_function_left);
+    catto_addFunction(context, "right", &catto_function_right);
+    catto_addFunction(context, "mid", &catto_function_mid);
 
     // Constants
 

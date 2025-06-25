@@ -185,6 +185,12 @@ typedef struct catto_OperatorMapping {
     catto_BinaryOperatorFunction binaryFunction;
 } catto_OperatorMapping;
 
+typedef enum {
+    CATTO_SLICING_METHOD_LEFT,
+    CATTO_SLICING_METHOD_RIGHT,
+    CATTO_SLICING_METHOD_MID
+} catto_SlicingMethod;
+
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
 void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);

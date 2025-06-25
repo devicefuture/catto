@@ -329,3 +329,52 @@ catto_TypedValue catto_function_upper(catto_Context* context, catto_DataType ret
 
     return returnValue;
 }
+
+catto_TypedValue catto_function_slicer(catto_Context* context, catto_SlicingMethod method, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Char* result = catto_copyString("");
+    catto_Int currentLength = catto_stringLength(value);
+    catto_Int startIndex = 0;
+    catto_Int endIndex = currentLength;
+    catto_Int length = 0;
+
+    if (method == CATTO_SLICING_METHOD_LEFT) {
+        endIndex = catto_asNumber(catto_evalNextArg(context));
+    } else if (method == CATTO_SLICING_METHOD_RIGHT) {
+        startIndex = currentLength - catto_asNumber(catto_evalNextArg(context));
+    } else {
+        startIndex = catto_asNumber(catto_evalNextArg(context));
+        endIndex = startIndex + catto_asNumber(catto_evalNextArg(context));
+    }
+
+    if (endIndex > currentLength) {
+        endIndex = currentLength;
+    }
+
+    for (catto_Int i = startIndex; i < endIndex; i++) {
+        if (i < 0) {
+            continue;
+        }
+
+        result = catto_appendCharToString(result, value[i]);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_left(catto_Context* context, catto_DataType returnType) {
+    return catto_function_slicer(context, CATTO_SLICING_METHOD_LEFT, returnType);
+}
+
+catto_TypedValue catto_function_right(catto_Context* context, catto_DataType returnType) {
+    return catto_function_slicer(context, CATTO_SLICING_METHOD_RIGHT, returnType);
+}
+
+catto_TypedValue catto_function_mid(catto_Context* context, catto_DataType returnType) {
+    return catto_function_slicer(context, CATTO_SLICING_METHOD_MID, returnType);
+}
