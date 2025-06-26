@@ -378,3 +378,55 @@ catto_TypedValue catto_function_right(catto_Context* context, catto_DataType ret
 catto_TypedValue catto_function_mid(catto_Context* context, catto_DataType returnType) {
     return catto_function_slicer(context, CATTO_SLICING_METHOD_MID, returnType);
 }
+
+catto_TypedValue catto_function_trimmer(catto_Context* context, catto_Bool trimLeft, catto_Bool trimRight, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Count currentLength = catto_stringLength(value);
+    catto_Char* result = catto_copyString("");
+
+    catto_Count startIndex = 0;
+    catto_Count endIndex = currentLength;
+
+    while (trimLeft && startIndex < currentLength) {
+        if (value[startIndex] == ' ') {
+            startIndex++;
+        } else {
+            break;
+        }
+    }
+
+    while (trimRight && endIndex > 1) {
+        if (value[endIndex - 1] == ' ') {
+            endIndex--;
+        } else {
+            break;
+        }
+    }
+
+    for (catto_Int i = startIndex; i < endIndex; i++) {
+        if (i < 0) {
+            continue;
+        }
+
+        result = catto_appendCharToString(result, value[i]);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_trim(catto_Context* context, catto_DataType returnType) {
+    return catto_function_trimmer(context, CATTO_TRUE, CATTO_TRUE, returnType);
+}
+
+catto_TypedValue catto_function_ltrim(catto_Context* context, catto_DataType returnType) {
+    return catto_function_trimmer(context, CATTO_TRUE, CATTO_FALSE, returnType);
+}
+
+catto_TypedValue catto_function_rtrim(catto_Context* context, catto_DataType returnType) {
+    return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
+}

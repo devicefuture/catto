@@ -72,6 +72,9 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "left", &catto_function_left);
     catto_addFunction(context, "right", &catto_function_right);
     catto_addFunction(context, "mid", &catto_function_mid);
+    catto_addFunction(context, "trim", &catto_function_trim);
+    catto_addFunction(context, "ltrim", &catto_function_ltrim);
+    catto_addFunction(context, "rtrim", &catto_function_rtrim);
 
     // Constants
 
