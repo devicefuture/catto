@@ -8,7 +8,7 @@ To build the catto library, run:
 ./build.sh
 ```
 
-The library will be built as a single header file in the `dist` directory. The interpreter and example code will also be built.
+The library will be built as a single header file in the `dist` directory, which will also include a header file used to configure catto. The interpreter and example code will also be built.
 
 ## Running the interpreter
 To start the interpreter, run:
