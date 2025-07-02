@@ -91,10 +91,12 @@ catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, 
         if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
             catto_Count newIndex = index + catto_stringLength(currentCommandHandler->name);
 
-            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
-                currentCommandHandler = currentCommandHandler->nextCommandHandler;
+            if (code[newIndex] == '$' || code[newIndex] == '%') {
+                goto skipCommandHandler;
+            }
 
-                continue;
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+                goto skipCommandHandler;
             }
 
             if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "scrawl")) {
@@ -113,6 +115,8 @@ catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, 
 
             return token;
         }
+
+        skipCommandHandler:
 
         currentCommandHandler = currentCommandHandler->nextCommandHandler;
     }

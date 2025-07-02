@@ -430,3 +430,20 @@ catto_TypedValue catto_function_ltrim(catto_Context* context, catto_DataType ret
 catto_TypedValue catto_function_rtrim(catto_Context* context, catto_DataType returnType) {
     return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
 }
+
+catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int repeatCount = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* result = catto_copyString("");
+
+    for (catto_Int i = 0; i < repeatCount; i++) {
+        result = catto_appendToString(result, value);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
