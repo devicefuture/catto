@@ -182,7 +182,7 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
         if (!string[i]) {
             goto splitHere;
         }
-        
+
         if (delimeterLength > 0 && catto_stringStartsWith(string + i, delimeter)) {
             goto splitHere;
         }
