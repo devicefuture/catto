@@ -161,6 +161,7 @@ typedef struct catto_Context {
     catto_Count subjectLineNumber;
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
+    catto_Count randomSeed;
     void* userData;
 } catto_Context;
 
@@ -572,6 +573,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
+    context->randomSeed = 0;
 
     return context;
 }
@@ -4305,7 +4307,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
         if (!string[i]) {
             goto splitHere;
         }
-        
+
         if (delimeterLength > 0 && catto_stringStartsWith(string + i, delimeter)) {
             goto splitHere;
         }
@@ -4571,6 +4573,14 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_repeat(catto_Context* context, c
     return returnValue;
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+
+    catto_Float value = context->randomSeed;
+
+    return catto_asTypedNumber(value / 0xFFFF);
+}
+
 // src/stdlib/stdlib.h
 
 CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
@@ -4651,6 +4661,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "ltrim", &catto_function_ltrim);
     catto_addFunction(context, "rtrim", &catto_function_rtrim);
     catto_addFunction(context, "repeat", &catto_function_repeat);
+    catto_addFunction(context, "random", &catto_function_random);
 
     // Constants
 

@@ -53,6 +53,7 @@ typedef struct catto_Context {
     catto_Count subjectLineNumber;
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
+    catto_Count randomSeed;
     void* userData;
 } catto_Context;
 

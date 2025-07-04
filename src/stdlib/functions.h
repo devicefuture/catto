@@ -447,3 +447,11 @@ catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType re
 
     return returnValue;
 }
+
+catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+
+    catto_Float value = context->randomSeed;
+
+    return catto_asTypedNumber(value / 0xFFFF);
+}
