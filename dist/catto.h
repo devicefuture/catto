@@ -161,6 +161,7 @@ typedef struct catto_Context {
     catto_Count subjectLineNumber;
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
+    catto_Count randomSeed;
     void* userData;
 } catto_Context;
 
@@ -572,6 +573,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
+    context->randomSeed = 0;
 
     return context;
 }
@@ -2428,10 +2430,12 @@ CATTO_FN_PREFIX catto_Token* catto_matchCommand(catto_Context* context, const ca
         if (catto_stringStartsWithCaseInsensitive(code + index, currentCommandHandler->name)) {
             catto_Count newIndex = index + catto_stringLength(currentCommandHandler->name);
 
-            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
-                currentCommandHandler = currentCommandHandler->nextCommandHandler;
+            if (code[newIndex] == '$' || code[newIndex] == '%') {
+                goto skipCommandHandler;
+            }
 
-                continue;
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+                goto skipCommandHandler;
             }
 
             if (catto_stringsEqualCaseInsensitive(currentCommandHandler->name, "scrawl")) {
@@ -2450,6 +2454,8 @@ CATTO_FN_PREFIX catto_Token* catto_matchCommand(catto_Context* context, const ca
 
             return token;
         }
+
+        skipCommandHandler:
 
         currentCommandHandler = currentCommandHandler->nextCommandHandler;
     }
@@ -4301,7 +4307,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
         if (!string[i]) {
             goto splitHere;
         }
-        
+
         if (delimeterLength > 0 && catto_stringStartsWith(string + i, delimeter)) {
             goto splitHere;
         }
@@ -4550,6 +4556,31 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_rtrim(catto_Context* context, ca
     return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int repeatCount = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* result = catto_copyString("");
+
+    for (catto_Int i = 0; i < repeatCount; i++) {
+        result = catto_appendToString(result, value);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+
+    catto_Float value = context->randomSeed;
+
+    return catto_asTypedNumber(value / 0xFFFF);
+}
+
 // src/stdlib/stdlib.h
 
 CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
@@ -4629,6 +4660,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "trim", &catto_function_trim);
     catto_addFunction(context, "ltrim", &catto_function_ltrim);
     catto_addFunction(context, "rtrim", &catto_function_rtrim);
+    catto_addFunction(context, "repeat", &catto_function_repeat);
+    catto_addFunction(context, "random", &catto_function_random);
 
     // Constants
 

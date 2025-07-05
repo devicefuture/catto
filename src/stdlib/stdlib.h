@@ -75,6 +75,8 @@ void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "trim", &catto_function_trim);
     catto_addFunction(context, "ltrim", &catto_function_ltrim);
     catto_addFunction(context, "rtrim", &catto_function_rtrim);
+    catto_addFunction(context, "repeat", &catto_function_repeat);
+    catto_addFunction(context, "random", &catto_function_random);
 
     // Constants
 

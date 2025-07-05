@@ -23,6 +23,7 @@ catto_Context* catto_newContext() {
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
+    context->randomSeed = 0;
 
     return context;
 }
