@@ -4314,7 +4314,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
             continue;
         }
 
-        splitHere:
+        splitHere: ;
 
         catto_TypedValue typedString = catto_asTypedString(currentString);
 

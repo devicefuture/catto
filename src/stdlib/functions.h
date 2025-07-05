@@ -195,7 +195,7 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
             continue;
         }
 
-        splitHere:
+        splitHere: ;
 
         catto_TypedValue typedString = catto_asTypedString(currentString);
 
