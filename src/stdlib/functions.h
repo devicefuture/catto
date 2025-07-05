@@ -1,3 +1,9 @@
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFFFFF
+#else
+    #define CATTO_RANDOM_MASK 0xFFFFFFFF
+#endif
+
 #define CATTO_TRIG_MODE_COMMAND(name, mode) void name(catto_Context* context) { \
         context->trigMode = mode; \
     }
@@ -449,9 +455,9 @@ catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType re
 }
 
 catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
-    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & CATTO_RANDOM_MASK;
 
     catto_Float value = context->randomSeed;
 
-    return catto_asTypedNumber(value / 0xFFFF);
+    return catto_asTypedNumber(value / CATTO_RANDOM_MASK);
 }
