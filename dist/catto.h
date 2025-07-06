@@ -2965,6 +2965,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
     astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
+    astNode->value.asExpressionLeaf.field = CATTO_NULL;
 
     return astNode;
 }

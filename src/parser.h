@@ -63,6 +63,7 @@ catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode*
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
     astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
+    astNode->value.asExpressionLeaf.field = CATTO_NULL;
 
     return astNode;
 }
