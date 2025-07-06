@@ -122,6 +122,7 @@ void runCode(catto_Context* context, char* code) {
         case CATTO_ERROR_STATE_NOT_A_LIST: message = "Cannot perform list operation on non-list variable"; break;
         case CATTO_ERROR_STATE_INVALID_LIST_VALUE: message = "Invalid list value"; break;
         case CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE: message = "Expected variable name"; break;
+        case CATTO_ERROR_STATE_UNKNOWN_FIELD: message = "Field is not present in list declaration"; break;
 
         default: break;
     }
