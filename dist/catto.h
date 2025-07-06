@@ -579,6 +579,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->statementStackCount = 0;
 
     context->pointersToGc = (void**)CATTO_MALLOC(0);
+    context->pointerTypesToGc = (catto_DataType*)CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
 
     context->errorState = CATTO_ERROR_STATE_NONE;
@@ -655,6 +656,7 @@ CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
+            context->pointersToGc[i] = CATTO_NULL;
             context->pointerTypesToGc[i] = CATTO_DATA_TYPE_NULL;
         }
     }
