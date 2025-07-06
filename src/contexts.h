@@ -343,6 +343,12 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
             return;
         }
 
+        if (value.type == CATTO_DATA_TYPE_LIST) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+
+            return;
+        }
+
         catto_List* list = variableValue.value.asList;
 
         while (index < 0) {
@@ -564,6 +570,40 @@ catto_TypedValue catto_evalNextArg(catto_Context* context) {
     return catto_evalExpression(context, catto_getNextArg(context));
 }
 
+catto_AstNode* catto_getPenultimateArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* penultimateArgument = CATTO_NULL;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        penultimateArgument = lastArgument;
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return penultimateArgument;
+}
+
+catto_TypedValue catto_evalPenultimateArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getPenultimateArg(context));
+}
+
+catto_AstNode* catto_getLastArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return lastArgument;
+}
+
+catto_TypedValue catto_evalLastArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getLastArg(context));
+}
+
 catto_Bool catto_step(catto_Context* context) {
     if (!context->nextParsedStatement) {
         return CATTO_FALSE;
@@ -649,6 +689,12 @@ catto_Bool catto_step(catto_Context* context) {
 
                 if (variableValue.type != CATTO_DATA_TYPE_LIST) {
                     context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+
+                    return CATTO_FALSE;
+                }
+
+                if (value.type == CATTO_DATA_TYPE_LIST) {
+                    context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
 
                     return CATTO_FALSE;
                 }

@@ -140,6 +140,10 @@ void catto_setListItem(catto_Context* context, catto_List* list, catto_Count ind
 
         catto_pushOntoList(list, value);
 
+        while (list->fieldCount > 0 && list->length % list->fieldCount > 0) {
+            catto_pushOntoList(list, catto_asTypedNumber(0));
+        }
+
         return;
     }
 
