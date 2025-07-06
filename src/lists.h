@@ -36,6 +36,10 @@ void catto_freeList(catto_Context* context, catto_List* list) {
         catto_addTypedValueToGc(context, list->values[i]);
     }
 
+    for (catto_Count i = 0; i < list->fieldCount; i++) {
+        CATTO_FREE(list->fields[i]);
+    }
+
     CATTO_FREE(list->values);
     CATTO_FREE(list->fields);
     CATTO_FREE(list);
