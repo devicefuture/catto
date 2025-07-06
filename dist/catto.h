@@ -385,7 +385,7 @@ catto_Char* catto_listToString(catto_List* list);
 catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
-catto_TypedValue catto_asTypedString(catto_Char* value);
+catto_TypedValue catto_asTypedString(const catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
@@ -655,7 +655,7 @@ CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointerTypesToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_DATA_TYPE_NULL;
         }
     }
 }
@@ -2401,7 +2401,7 @@ CATTO_FN_PREFIX catto_Char* catto_asString(catto_TypedValue value) {
     return catto_copyString("");
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_asTypedString(catto_Char* value) {
+CATTO_FN_PREFIX catto_TypedValue catto_asTypedString(const catto_Char* value) {
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
         .value = {.asString = catto_copyString(value)}

@@ -93,7 +93,7 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr) {
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointerTypesToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_DATA_TYPE_NULL;
         }
     }
 }
