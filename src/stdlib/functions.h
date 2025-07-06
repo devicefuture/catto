@@ -151,7 +151,10 @@ catto_TypedValue catto_function_len(catto_Context* context, catto_DataType retur
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        return catto_asTypedNumber(value.value.asList->length);
+        catto_List* list = value.value.asList;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        return catto_asTypedNumber(list->length / fieldCount);
     }
 
     return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
@@ -265,18 +268,42 @@ catto_TypedValue catto_function_join(catto_Context* context, catto_DataType retu
 
 catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
-    catto_TypedValue searchValue = catto_evalNextArg(context);
+    catto_AstNode* searchFieldArg = catto_getNextArg(context);
+    catto_AstNode* searchValueArg = catto_getNextArg(context);
+
+    if (!searchValueArg) {
+        searchValueArg = searchFieldArg;
+        searchFieldArg = CATTO_NULL;
+    }
+
+    catto_TypedValue searchValue = catto_evalExpression(context, searchValueArg);
 
     if (sequence.type == CATTO_DATA_TYPE_LIST) {
         catto_List* list = sequence.value.asList;
+        catto_Char* field = searchFieldArg ? catto_asString(catto_evalExpression(context, searchFieldArg)) : CATTO_NULL;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        if (field && list->fieldCount == 0) {
+            CATTO_FREE(field);
+
+            return catto_asTypedNumber(-1);
+        }
 
         for (catto_Count i = 0; i < list->length; i++) {
+            if (field && !catto_stringsEqual(field, list->fields[i % fieldCount])) {
+                continue;
+            }
+
             catto_TypedValue item = list->values[i];
 
             if (catto_asNumber(catto_binary_equal(context, item, searchValue))) {
-                return catto_asTypedNumber(i);
+                CATTO_FREE(field);
+
+                return catto_asTypedNumber(i / fieldCount);
             }
         }
+
+        CATTO_FREE(field);
 
         return catto_asTypedNumber(-1);
     }

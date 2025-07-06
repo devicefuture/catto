@@ -9,7 +9,8 @@ typedef enum {
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
-    CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE
+    CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE,
+    CATTO_ERROR_STATE_UNKNOWN_FIELD
 } catto_ErrorState;
 
 typedef enum {
@@ -100,6 +101,8 @@ typedef struct catto_Token {
 typedef struct catto_List {
     struct catto_TypedValue* values;
     catto_Count length;
+    catto_Char** fields;
+    catto_Count fieldCount;
     catto_Count referenceCount;
 } catto_List;
 
@@ -151,6 +154,7 @@ typedef struct catto_AstNode {
                 struct {
                     catto_Char* subjectVariable;
                     struct catto_AstNode* index;
+                    catto_Char* field;
                 } asAssignee;
                 struct {
                     catto_Char* name;
@@ -163,6 +167,7 @@ typedef struct catto_AstNode {
             catto_Char* subjectVariable;
             struct catto_AstNode* firstArgument;
             struct catto_AstNode* index;
+            catto_Char* field;
             catto_Bool appendFlag;
         } asExpressionLeaf;
         struct {
@@ -211,6 +216,10 @@ catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_AstNode* catto_getNextArg(catto_Context* context);
 catto_TypedValue catto_evalNextArg(catto_Context* context);
+catto_AstNode* catto_getPenultimateArg(catto_Context* context);
+catto_TypedValue catto_evalPenultimateArg(catto_Context* context);
+catto_AstNode* catto_getLastArg(catto_Context* context);
+catto_TypedValue catto_evalLastArg(catto_Context* context);
 catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
@@ -251,6 +260,7 @@ catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* characte
 catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
+void catto_addListField(catto_List* list, catto_Char* field);
 catto_List* catto_referenceList(catto_List* list);
 void catto_dereferenceList(catto_Context* context, catto_List* list);
 void catto_freeList(catto_Context* context, catto_List* list);
@@ -258,6 +268,8 @@ void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
 catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
+catto_Count catto_getFlatIndex(catto_List* list, catto_Count index);
+catto_Count catto_getFieldOffset(catto_List* list, catto_Char* field, catto_Bool* exists);
 catto_TypedValue catto_getListItem(catto_List* list, catto_Count index);
 void catto_setListItem(catto_Context* context, catto_List* list, catto_Count index, catto_TypedValue value);
 catto_Char* catto_listToString(catto_List* list);
