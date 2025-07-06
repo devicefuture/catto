@@ -1,7 +1,7 @@
 #ifdef CATTO_USE_64_BIT
-    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFFFFF
+    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFF
 #else
-    #define CATTO_RANDOM_MASK 0xFFFFFFFF
+    #define CATTO_RANDOM_MASK 0xFFFFFF
 #endif
 
 #define CATTO_TRIG_MODE_COMMAND(name, mode) void name(catto_Context* context) { \

@@ -585,7 +585,7 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
-    context->randomSeed = 0;
+    context->randomSeed = 0xFFFFFFFF;
 
     return context;
 }
@@ -2616,7 +2616,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchStrings(catto_Context* context, const ca
         if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
             catto_Count newIndex = index + catto_stringLength(currentString);
 
-            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex - 1) && !catto_onWordBoundary(code, newIndex)) {
                 goto skipMatch;
             }
 
@@ -4365,9 +4365,9 @@ CATTO_FN_PREFIX void catto_command_remove(catto_Context* context) {
 // src/stdlib/functions.h
 
 #ifdef CATTO_USE_64_BIT
-    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFFFFF
+    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFF
 #else
-    #define CATTO_RANDOM_MASK 0xFFFFFFFF
+    #define CATTO_RANDOM_MASK 0xFFFFFF
 #endif
 
 #define CATTO_TRIG_MODE_COMMAND(name, mode) CATTO_FN_PREFIX void name(catto_Context* context) { \

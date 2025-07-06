@@ -134,7 +134,7 @@ catto_Token* catto_matchStrings(catto_Context* context, const catto_Char** match
         if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
             catto_Count newIndex = index + catto_stringLength(currentString);
 
-            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex)) {
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex - 1) && !catto_onWordBoundary(code, newIndex)) {
                 goto skipMatch;
             }
 
