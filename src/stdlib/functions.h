@@ -464,6 +464,62 @@ catto_TypedValue catto_function_rtrim(catto_Context* context, catto_DataType ret
     return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
 }
 
+catto_TypedValue catto_function_lpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString("");
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    result = catto_appendToString(result, value);
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_rpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString(value);
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
 catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Int repeatCount = catto_asNumber(catto_evalNextArg(context));
