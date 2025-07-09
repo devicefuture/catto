@@ -153,13 +153,18 @@ uint64_t getEpoch() {
 }
 
 void inputCommand(catto_Context* context) {
-    char* string = catto_asString(catto_evalNextArg(context));
+    catto_AstNode* stringArg = catto_getNextArg(context);
+    catto_AstNode* identifierArg = catto_hasNextArg(context) ? catto_getNextArg(context) : CATTO_NULL;
 
-    printf("%s", string);
+    if (identifierArg) {
+        char* string = catto_asString(catto_evalExpression(context, stringArg));
 
-    free(string);
+        printf("%s", string);
 
-    catto_AstNode* identifier = catto_getNextArg(context);
+        free(string);
+    } else {
+        identifierArg = stringArg;
+    }
 
     char* line = CATTO_NULL;
     bool finished = readLine(&line);
@@ -174,7 +179,7 @@ void inputCommand(catto_Context* context) {
         .value.asString = line
     };
 
-    catto_assignValue(context, identifier, value);
+    catto_assignValue(context, identifierArg, value);
 
     free(line);
 }
