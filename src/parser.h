@@ -481,6 +481,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
             if (!catto_parseExpression(currentTokenPtr, &value)) {
                 CATTO_FREE(subject);
+                CATTO_FREE(field);
                 goto syntaxError;
             }
 

@@ -337,9 +337,9 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
 
     if (indexAstNode) {
         catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-        catto_TypedValue variableValue = *catto_getVariable(context, name);
+        catto_TypedValue* variableValuePtr = catto_getVariable(context, name);
 
-        if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+        if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
             context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
             return;
@@ -351,7 +351,7 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
             return;
         }
 
-        catto_List* list = variableValue.value.asList;
+        catto_List* list = variableValuePtr->value.asList;
 
         while (index < 0) {
             index += list->length;
@@ -687,9 +687,9 @@ catto_Bool catto_step(catto_Context* context) {
 
             if (indexAstNode) {
                 catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-                catto_TypedValue variableValue = *catto_getVariable(context, variableName);
+                catto_TypedValue* variableValuePtr = catto_getVariable(context, variableName);
 
-                if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+                if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
                     context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
                     return CATTO_FALSE;
@@ -701,7 +701,7 @@ catto_Bool catto_step(catto_Context* context) {
                     return CATTO_FALSE;
                 }
 
-                catto_List* list = variableValue.value.asList;
+                catto_List* list = variableValuePtr->value.asList;
 
                 while (index < 0) {
                     index += list->length;
