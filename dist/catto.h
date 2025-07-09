@@ -190,7 +190,8 @@ typedef enum {
     CATTO_TOKEN_TYPE_OPENING_BRACKET = '(',
     CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')',
     CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET = '[',
-    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']'
+    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']',
+    CATTO_TOKEN_TYPE_FIELD_ACCESSOR = '.'
 } catto_TokenType;
 
 typedef struct catto_Token {
@@ -2054,6 +2055,7 @@ CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* strin
     catto_Float exponentIsNegative = CATTO_FALSE;
     catto_Bool afterPoint = CATTO_FALSE;
     catto_Bool hadDigit = CATTO_FALSE;
+    catto_Bool hadDigitAfterPoint = CATTO_FALSE;
     catto_Bool afterExponentMark = CATTO_FALSE;
     catto_Bool afterExponentSign = CATTO_FALSE;
 
@@ -2104,11 +2106,16 @@ CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* strin
             }
 
             hadDigit = CATTO_TRUE;
+            hadDigitAfterPoint = CATTO_TRUE;
         } else {
             break;
         }
 
         i++;
+    }
+
+    if (afterPoint && !hadDigit && !hadDigitAfterPoint) {
+        return 0;
     }
 
     if (!afterExponentMark) {
@@ -2856,6 +2863,10 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
             continue;
         }
 
+        if (catto_matchChar('.', CATTO_TOKEN_TYPE_FIELD_ACCESSOR, code, &index, &currentToken)) {
+            continue;
+        }
+
         catto_addToken(CATTO_TOKEN_TYPE_SYNTAX_ERROR, &currentToken);
 
         break;
@@ -3046,10 +3057,14 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTo
                     return CATTO_NULL;
                 }
 
-                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+                if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                    catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
-                if (fieldToken) {
-                    field = catto_copyString(fieldToken->value.asString);
+                    if (fieldToken) {
+                        field = catto_copyString(fieldToken->value.asString);
+                    } else {
+                        return CATTO_NULL;
+                    }
                 }
             }
 
@@ -3365,10 +3380,14 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
                 goto syntaxError;
             }
 
-            catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
-            if (fieldToken) {
-                field = catto_copyString(fieldToken->value.asString);
+                if (fieldToken) {
+                    field = catto_copyString(fieldToken->value.asString);
+                } else {
+                    return CATTO_NULL;
+                }
             }
         }
 

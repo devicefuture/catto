@@ -140,10 +140,14 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
                     return CATTO_NULL;
                 }
 
-                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+                if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                    catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
-                if (fieldToken) {
-                    field = catto_copyString(fieldToken->value.asString);
+                    if (fieldToken) {
+                        field = catto_copyString(fieldToken->value.asString);
+                    } else {
+                        return CATTO_NULL;
+                    }
                 }
             }
 
@@ -459,10 +463,14 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
                 goto syntaxError;
             }
 
-            catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
 
-            if (fieldToken) {
-                field = catto_copyString(fieldToken->value.asString);
+                if (fieldToken) {
+                    field = catto_copyString(fieldToken->value.asString);
+                } else {
+                    return CATTO_NULL;
+                }
             }
         }
 

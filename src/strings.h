@@ -186,6 +186,7 @@ catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* 
     catto_Float exponentIsNegative = CATTO_FALSE;
     catto_Bool afterPoint = CATTO_FALSE;
     catto_Bool hadDigit = CATTO_FALSE;
+    catto_Bool hadDigitAfterPoint = CATTO_FALSE;
     catto_Bool afterExponentMark = CATTO_FALSE;
     catto_Bool afterExponentSign = CATTO_FALSE;
 
@@ -236,11 +237,16 @@ catto_Float catto_unsignedStringToNumber(const catto_Char* string, catto_Count* 
             }
 
             hadDigit = CATTO_TRUE;
+            hadDigitAfterPoint = CATTO_TRUE;
         } else {
             break;
         }
 
         i++;
+    }
+
+    if (afterPoint && !hadDigit && !hadDigitAfterPoint) {
+        return 0;
     }
 
     if (!afterExponentMark) {

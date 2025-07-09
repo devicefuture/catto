@@ -368,6 +368,10 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
             continue;
         }
 
+        if (catto_matchChar('.', CATTO_TOKEN_TYPE_FIELD_ACCESSOR, code, &index, &currentToken)) {
+            continue;
+        }
+
         catto_addToken(CATTO_TOKEN_TYPE_SYNTAX_ERROR, &currentToken);
 
         break;
