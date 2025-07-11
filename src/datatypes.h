@@ -35,7 +35,7 @@ catto_Char* catto_asString(catto_TypedValue value) {
     return catto_copyString("");
 }
 
-catto_TypedValue catto_asTypedString(catto_Char* value) {
+catto_TypedValue catto_asTypedString(const catto_Char* value) {
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
         .value = {.asString = catto_copyString(value)}

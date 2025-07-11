@@ -265,7 +265,7 @@ catto_Char* catto_listToString(catto_List* list);
 catto_Float catto_asNumber(catto_TypedValue value);
 catto_TypedValue catto_asTypedNumber(catto_Float value);
 catto_Char* catto_asString(catto_TypedValue value);
-catto_TypedValue catto_asTypedString(catto_Char* value);
+catto_TypedValue catto_asTypedString(const catto_Char* value);
 catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
