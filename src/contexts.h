@@ -17,13 +17,14 @@ catto_Context* catto_newContext() {
     context->statementStackCount = 0;
 
     context->pointersToGc = (void**)CATTO_MALLOC(0);
+    context->pointerTypesToGc = (catto_DataType*)CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
 
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
-    context->randomSeed = 0;
+    context->randomSeed = 0xFFFFFFFF;
 
     return context;
 }
@@ -93,7 +94,8 @@ void catto_removePointerFromGc(catto_Context* context, void* ptr) {
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointerTypesToGc[i] = CATTO_NULL;
+            context->pointersToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_DATA_TYPE_NULL;
         }
     }
 }
@@ -330,22 +332,41 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
     }
 
     catto_AstNode* indexAstNode = astNode->value.asExpressionLeaf.index;
+    catto_Char* field = astNode->value.asExpressionLeaf.field;
+    catto_Bool fieldExists;
 
     if (indexAstNode) {
         catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-        catto_TypedValue variableValue = *catto_getVariable(context, name);
+        catto_TypedValue* variableValuePtr = catto_getVariable(context, name);
 
-        if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+        if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
             context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
             return;
         }
 
-        while (index < 0) {
-            index += variableValue.value.asList->length;
+        if (value.type == CATTO_DATA_TYPE_LIST) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+
+            return;
         }
 
-        catto_setListItem(context, variableValue.value.asList, index, catto_copyTypedValue(value));
+        catto_List* list = variableValuePtr->value.asList;
+
+        while (index < 0) {
+            index += list->length;
+        }
+
+        index = catto_getFlatIndex(list, index);
+        index += catto_getFieldOffset(list, field, &fieldExists);
+
+        if (field && !fieldExists) {
+            context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+            return;
+        }
+
+        catto_setListItem(context, list, index, catto_copyTypedValue(value));
 
         return;
     }
@@ -385,6 +406,8 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
             if (variableValuePtr) {
                 catto_TypedValue variableValue = *variableValuePtr;
                 catto_AstNode* indexAstNode = astNode->value.asExpressionLeaf.index;
+                catto_Char* field = astNode->value.asExpressionLeaf.field;
+                catto_Bool fieldExists;
 
                 if (indexAstNode) {
                     catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
@@ -395,11 +418,22 @@ catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* ast
                         return DEFAULT_RETURN_VALUE;
                     }
 
+                    catto_List* list = variableValue.value.asList;
+
                     while (index < 0) {
-                        index += variableValue.value.asList->length;
+                        index += list->length;
                     }
 
-                    variableValue = catto_getListItem(variableValue.value.asList, index);
+                    index = catto_getFlatIndex(list, index);
+                    index += catto_getFieldOffset(list, field, &fieldExists);
+
+                    if (field && !fieldExists) {
+                        context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+                        return DEFAULT_RETURN_VALUE;
+                    }
+
+                    variableValue = catto_getListItem(list, index);
                 }
 
                 if (variableValue.type == CATTO_DATA_TYPE_FUNCTION) {
@@ -538,6 +572,40 @@ catto_TypedValue catto_evalNextArg(catto_Context* context) {
     return catto_evalExpression(context, catto_getNextArg(context));
 }
 
+catto_AstNode* catto_getPenultimateArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* penultimateArgument = CATTO_NULL;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        penultimateArgument = lastArgument;
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return penultimateArgument;
+}
+
+catto_TypedValue catto_evalPenultimateArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getPenultimateArg(context));
+}
+
+catto_AstNode* catto_getLastArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return lastArgument;
+}
+
+catto_TypedValue catto_evalLastArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getLastArg(context));
+}
+
 catto_Bool catto_step(catto_Context* context) {
     if (!context->nextParsedStatement) {
         return CATTO_FALSE;
@@ -613,23 +681,42 @@ catto_Bool catto_step(catto_Context* context) {
         {
             catto_Char* variableName = currentStatement->value.asStatement.attributes.asAssignee.subjectVariable;
             catto_AstNode* indexAstNode = currentStatement->value.asStatement.attributes.asAssignee.index;
+            catto_Char* field = currentStatement->value.asStatement.attributes.asAssignee.field;
+            catto_Bool fieldExists;
             catto_TypedValue value = catto_evalExpression(context, currentStatement->value.asStatement.firstArgument);
 
             if (indexAstNode) {
                 catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-                catto_TypedValue variableValue = *catto_getVariable(context, variableName);
+                catto_TypedValue* variableValuePtr = catto_getVariable(context, variableName);
 
-                if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+                if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
                     context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
                     return CATTO_FALSE;
                 }
 
-                while (index < 0) {
-                    index += variableValue.value.asList->length;
+                if (value.type == CATTO_DATA_TYPE_LIST) {
+                    context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+
+                    return CATTO_FALSE;
                 }
 
-                catto_setListItem(context, variableValue.value.asList, index, value);
+                catto_List* list = variableValuePtr->value.asList;
+
+                while (index < 0) {
+                    index += list->length;
+                }
+
+                index = catto_getFlatIndex(list, index);
+                index += catto_getFieldOffset(list, field, &fieldExists);
+
+                if (field && !fieldExists) {
+                    context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+                    return CATTO_FALSE;
+                }
+
+                catto_setListItem(context, list, index, value);
 
                 break;
             }

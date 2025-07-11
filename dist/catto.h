@@ -117,7 +117,8 @@ typedef enum {
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
-    CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE
+    CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE,
+    CATTO_ERROR_STATE_UNKNOWN_FIELD
 } catto_ErrorState;
 
 typedef enum {
@@ -189,7 +190,8 @@ typedef enum {
     CATTO_TOKEN_TYPE_OPENING_BRACKET = '(',
     CATTO_TOKEN_TYPE_CLOSING_BRACKET = ')',
     CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET = '[',
-    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']'
+    CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET = ']',
+    CATTO_TOKEN_TYPE_FIELD_ACCESSOR = '.'
 } catto_TokenType;
 
 typedef struct catto_Token {
@@ -208,6 +210,8 @@ typedef struct catto_Token {
 typedef struct catto_List {
     struct catto_TypedValue* values;
     catto_Count length;
+    catto_Char** fields;
+    catto_Count fieldCount;
     catto_Count referenceCount;
 } catto_List;
 
@@ -259,6 +263,7 @@ typedef struct catto_AstNode {
                 struct {
                     catto_Char* subjectVariable;
                     struct catto_AstNode* index;
+                    catto_Char* field;
                 } asAssignee;
                 struct {
                     catto_Char* name;
@@ -271,6 +276,7 @@ typedef struct catto_AstNode {
             catto_Char* subjectVariable;
             struct catto_AstNode* firstArgument;
             struct catto_AstNode* index;
+            catto_Char* field;
             catto_Bool appendFlag;
         } asExpressionLeaf;
         struct {
@@ -319,6 +325,10 @@ catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_AstNode* catto_getNextArg(catto_Context* context);
 catto_TypedValue catto_evalNextArg(catto_Context* context);
+catto_AstNode* catto_getPenultimateArg(catto_Context* context);
+catto_TypedValue catto_evalPenultimateArg(catto_Context* context);
+catto_AstNode* catto_getLastArg(catto_Context* context);
+catto_TypedValue catto_evalLastArg(catto_Context* context);
 catto_Bool catto_step(catto_Context* context);
 void catto_goto(catto_Context* context, catto_Count lineNumber);
 void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement);
@@ -359,6 +369,7 @@ catto_Float catto_stringToNumber(const catto_Char* string, catto_Count* characte
 catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base, catto_Count* charactersEaten);
 
 catto_List* catto_newList();
+void catto_addListField(catto_List* list, catto_Char* field);
 catto_List* catto_referenceList(catto_List* list);
 void catto_dereferenceList(catto_Context* context, catto_List* list);
 void catto_freeList(catto_Context* context, catto_List* list);
@@ -366,6 +377,8 @@ void catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
 catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
+catto_Count catto_getFlatIndex(catto_List* list, catto_Count index);
+catto_Count catto_getFieldOffset(catto_List* list, catto_Char* field, catto_Bool* exists);
 catto_TypedValue catto_getListItem(catto_List* list, catto_Count index);
 void catto_setListItem(catto_Context* context, catto_List* list, catto_Count index, catto_TypedValue value);
 catto_Char* catto_listToString(catto_List* list);
@@ -567,13 +580,14 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->statementStackCount = 0;
 
     context->pointersToGc = (void**)CATTO_MALLOC(0);
+    context->pointerTypesToGc = (catto_DataType*)CATTO_MALLOC(0);
     context->pointersToGcCount = 0;
 
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
-    context->randomSeed = 0;
+    context->randomSeed = 0xFFFFFFFF;
 
     return context;
 }
@@ -643,7 +657,8 @@ CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr
 
     for (catto_Count i = 0; i < context->pointersToGcCount; i++) {
         if (context->pointersToGc[i] == ptr) {
-            context->pointerTypesToGc[i] = CATTO_NULL;
+            context->pointersToGc[i] = CATTO_NULL;
+            context->pointerTypesToGc[i] = CATTO_DATA_TYPE_NULL;
         }
     }
 }
@@ -880,22 +895,41 @@ CATTO_FN_PREFIX void catto_assignValue(catto_Context* context, catto_AstNode* as
     }
 
     catto_AstNode* indexAstNode = astNode->value.asExpressionLeaf.index;
+    catto_Char* field = astNode->value.asExpressionLeaf.field;
+    catto_Bool fieldExists;
 
     if (indexAstNode) {
         catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-        catto_TypedValue variableValue = *catto_getVariable(context, name);
+        catto_TypedValue* variableValuePtr = catto_getVariable(context, name);
 
-        if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+        if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
             context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
             return;
         }
 
-        while (index < 0) {
-            index += variableValue.value.asList->length;
+        if (value.type == CATTO_DATA_TYPE_LIST) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+
+            return;
         }
 
-        catto_setListItem(context, variableValue.value.asList, index, catto_copyTypedValue(value));
+        catto_List* list = variableValuePtr->value.asList;
+
+        while (index < 0) {
+            index += list->length;
+        }
+
+        index = catto_getFlatIndex(list, index);
+        index += catto_getFieldOffset(list, field, &fieldExists);
+
+        if (field && !fieldExists) {
+            context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+            return;
+        }
+
+        catto_setListItem(context, list, index, catto_copyTypedValue(value));
 
         return;
     }
@@ -935,6 +969,8 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
             if (variableValuePtr) {
                 catto_TypedValue variableValue = *variableValuePtr;
                 catto_AstNode* indexAstNode = astNode->value.asExpressionLeaf.index;
+                catto_Char* field = astNode->value.asExpressionLeaf.field;
+                catto_Bool fieldExists;
 
                 if (indexAstNode) {
                     catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
@@ -945,11 +981,22 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                         return DEFAULT_RETURN_VALUE;
                     }
 
+                    catto_List* list = variableValue.value.asList;
+
                     while (index < 0) {
-                        index += variableValue.value.asList->length;
+                        index += list->length;
                     }
 
-                    variableValue = catto_getListItem(variableValue.value.asList, index);
+                    index = catto_getFlatIndex(list, index);
+                    index += catto_getFieldOffset(list, field, &fieldExists);
+
+                    if (field && !fieldExists) {
+                        context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+                        return DEFAULT_RETURN_VALUE;
+                    }
+
+                    variableValue = catto_getListItem(list, index);
                 }
 
                 if (variableValue.type == CATTO_DATA_TYPE_FUNCTION) {
@@ -1088,6 +1135,40 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalNextArg(catto_Context* context) {
     return catto_evalExpression(context, catto_getNextArg(context));
 }
 
+CATTO_FN_PREFIX catto_AstNode* catto_getPenultimateArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* penultimateArgument = CATTO_NULL;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        penultimateArgument = lastArgument;
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return penultimateArgument;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_evalPenultimateArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getPenultimateArg(context));
+}
+
+CATTO_FN_PREFIX catto_AstNode* catto_getLastArg(catto_Context* context) {
+    catto_AstNode* currentArgument = context->nextParsedArgument;
+    catto_AstNode* lastArgument = CATTO_NULL;
+
+    while (currentArgument) {
+        lastArgument = currentArgument;
+        currentArgument = currentArgument->nextAstNode;
+    }
+
+    return lastArgument;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_evalLastArg(catto_Context* context) {
+    return catto_evalExpression(context, catto_getLastArg(context));
+}
+
 CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
     if (!context->nextParsedStatement) {
         return CATTO_FALSE;
@@ -1163,23 +1244,42 @@ CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
         {
             catto_Char* variableName = currentStatement->value.asStatement.attributes.asAssignee.subjectVariable;
             catto_AstNode* indexAstNode = currentStatement->value.asStatement.attributes.asAssignee.index;
+            catto_Char* field = currentStatement->value.asStatement.attributes.asAssignee.field;
+            catto_Bool fieldExists;
             catto_TypedValue value = catto_evalExpression(context, currentStatement->value.asStatement.firstArgument);
 
             if (indexAstNode) {
                 catto_Int index = (catto_Int)catto_asNumber(catto_evalExpression(context, indexAstNode));
-                catto_TypedValue variableValue = *catto_getVariable(context, variableName);
+                catto_TypedValue* variableValuePtr = catto_getVariable(context, variableName);
 
-                if (variableValue.type != CATTO_DATA_TYPE_LIST) {
+                if (!variableValuePtr || variableValuePtr->type != CATTO_DATA_TYPE_LIST) {
                     context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
                     return CATTO_FALSE;
                 }
 
-                while (index < 0) {
-                    index += variableValue.value.asList->length;
+                if (value.type == CATTO_DATA_TYPE_LIST) {
+                    context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+
+                    return CATTO_FALSE;
                 }
 
-                catto_setListItem(context, variableValue.value.asList, index, value);
+                catto_List* list = variableValuePtr->value.asList;
+
+                while (index < 0) {
+                    index += list->length;
+                }
+
+                index = catto_getFlatIndex(list, index);
+                index += catto_getFieldOffset(list, field, &fieldExists);
+
+                if (field && !fieldExists) {
+                    context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
+
+                    return CATTO_FALSE;
+                }
+
+                catto_setListItem(context, list, index, value);
 
                 break;
             }
@@ -1955,6 +2055,7 @@ CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* strin
     catto_Float exponentIsNegative = CATTO_FALSE;
     catto_Bool afterPoint = CATTO_FALSE;
     catto_Bool hadDigit = CATTO_FALSE;
+    catto_Bool hadDigitAfterPoint = CATTO_FALSE;
     catto_Bool afterExponentMark = CATTO_FALSE;
     catto_Bool afterExponentSign = CATTO_FALSE;
 
@@ -2005,11 +2106,16 @@ CATTO_FN_PREFIX catto_Float catto_unsignedStringToNumber(const catto_Char* strin
             }
 
             hadDigit = CATTO_TRUE;
+            hadDigitAfterPoint = CATTO_TRUE;
         } else {
             break;
         }
 
         i++;
+    }
+
+    if (afterPoint && !hadDigit && !hadDigitAfterPoint) {
+        return 0;
     }
 
     if (!afterExponentMark) {
@@ -2092,9 +2198,16 @@ CATTO_FN_PREFIX catto_List* catto_newList() {
 
     list->values = (catto_TypedValue*)CATTO_MALLOC(0);
     list->length = 0;
+    list->fields = (catto_Char**)CATTO_MALLOC(0);
+    list->fieldCount = 0;
     list->referenceCount = 0;
 
     return list;
+}
+
+CATTO_FN_PREFIX void catto_addListField(catto_List* list, catto_Char* field) {
+    list->fields = (catto_Char**)CATTO_REALLOC(list->fields, (++list->fieldCount) * sizeof(catto_Char*));
+    list->fields[list->fieldCount - 1] = catto_copyString(field);
 }
 
 CATTO_FN_PREFIX catto_List* catto_referenceList(catto_List* list) {
@@ -2118,7 +2231,12 @@ CATTO_FN_PREFIX void catto_freeList(catto_Context* context, catto_List* list) {
         catto_addTypedValueToGc(context, list->values[i]);
     }
 
+    for (catto_Count i = 0; i < list->fieldCount; i++) {
+        CATTO_FREE(list->fields[i]);
+    }
+
     CATTO_FREE(list->values);
+    CATTO_FREE(list->fields);
     CATTO_FREE(list);
 }
 
@@ -2175,6 +2293,36 @@ CATTO_FN_PREFIX catto_TypedValue catto_removeFromList(catto_Context* context, ca
     return value;
 }
 
+CATTO_FN_PREFIX catto_Count catto_getFlatIndex(catto_List* list, catto_Count index) {
+    if (list->fieldCount == 0) {
+        return index;
+    }
+
+    return index * list->fieldCount;
+}
+
+CATTO_FN_PREFIX catto_Count catto_getFieldOffset(catto_List* list, catto_Char* field, catto_Bool* exists) {
+    if (exists) {
+        *exists = CATTO_FALSE;
+    }
+
+    if (list->fieldCount == 0 || !field) {
+        return 0;
+    }
+
+    for (catto_Count i = 0; i < list->fieldCount; i++) {
+        if (catto_stringsEqualCaseInsensitive(list->fields[i], field)) {
+            if (exists) {
+                *exists = CATTO_TRUE;
+            }
+
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_getListItem(catto_List* list, catto_Count index) {
     if (index >= list->length) {
         return catto_asTypedNumber(0);
@@ -2190,6 +2338,10 @@ CATTO_FN_PREFIX void catto_setListItem(catto_Context* context, catto_List* list,
         }
 
         catto_pushOntoList(list, value);
+
+        while (list->fieldCount > 0 && list->length % list->fieldCount > 0) {
+            catto_pushOntoList(list, catto_asTypedNumber(0));
+        }
 
         return;
     }
@@ -2207,7 +2359,11 @@ CATTO_FN_PREFIX catto_Char* catto_listToString(catto_List* list) {
     catto_Char* string = catto_asString(list->values[0]);
 
     for (catto_Count i = 1; i < list->length; i++) {
-        string = catto_appendToString(string, ", ");
+        if (list->fieldCount > 0 && i % list->fieldCount == 0) {
+            string = catto_appendToString(string, "\n");
+        } else {
+            string = catto_appendToString(string, ", ");
+        }
 
         catto_Char* nextItemString = catto_asString(list->values[i]);
 
@@ -2395,7 +2551,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchLineNumber(const catto_Char* code, catto
 CATTO_FN_PREFIX catto_Token* catto_matchComment(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
 
-    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem"))) {
+    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem "))) {
         return CATTO_NULL;
     }
 
@@ -2463,7 +2619,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchCommand(catto_Context* context, const ca
     return CATTO_NULL;
 }
 
-CATTO_FN_PREFIX catto_Token* catto_matchStrings(const catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+CATTO_FN_PREFIX catto_Token* catto_matchStrings(catto_Context* context, const catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
@@ -2471,6 +2627,12 @@ CATTO_FN_PREFIX catto_Token* catto_matchStrings(const catto_Char** matchStrings,
         const catto_Char* currentString = matchStrings[i];
 
         if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
+            catto_Count newIndex = index + catto_stringLength(currentString);
+
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex - 1) && !catto_onWordBoundary(code, newIndex)) {
+                goto skipMatch;
+            }
+
             catto_Token* token = catto_addToken(type, currentTokenPtr);
 
             token->value.asConstString = currentString;
@@ -2479,6 +2641,8 @@ CATTO_FN_PREFIX catto_Token* catto_matchStrings(const catto_Char** matchStrings,
 
             return token;
         }
+
+        skipMatch:
 
         i++;
     }
@@ -2679,7 +2843,7 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
             continue;
         }
 
-        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
+        if (catto_matchStrings(context, catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
             continue;
         }
 
@@ -2696,6 +2860,10 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
         }
 
         if (catto_matchNumber(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchChar('.', CATTO_TOKEN_TYPE_FIELD_ACCESSOR, code, &index, &currentToken)) {
             continue;
         }
 
@@ -2812,6 +2980,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
     astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
+    astNode->value.asExpressionLeaf.field = CATTO_NULL;
 
     return astNode;
 }
@@ -2835,6 +3004,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTo
     catto_Char* subjectVariable = CATTO_NULL;
     catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* index = CATTO_NULL;
+    catto_Char* field = CATTO_NULL;
 
     switch (token->type) {
         case CATTO_TOKEN_TYPE_NUMBER:
@@ -2886,6 +3056,16 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTo
                 if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
                     return CATTO_NULL;
                 }
+
+                if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                    catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+                    if (fieldToken) {
+                        field = catto_copyString(fieldToken->value.asString);
+                    } else {
+                        return CATTO_NULL;
+                    }
+                }
             }
 
             break;
@@ -2900,6 +3080,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTo
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
     astNode->value.asExpressionLeaf.firstArgument = firstArgument;
     astNode->value.asExpressionLeaf.index = index;
+    astNode->value.asExpressionLeaf.field = field;
     astNode->value.asExpressionLeaf.appendFlag = CATTO_FALSE;
 
     catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
@@ -3161,6 +3342,12 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
 
+        if (catto_stringsEqualCaseInsensitive(commandName, "dim")) {
+            firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
+
+            catto_eatIfKeyword(currentTokenPtr, "with");
+        }
+
         finishAstNode:
 
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
@@ -3183,7 +3370,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
     if (identifierToken) {
         catto_Char* subject = catto_copyString(identifierToken->value.asString);
         catto_AstNode* index = CATTO_NULL;
-        catto_Bool parsedAccessor = CATTO_FALSE;
+        catto_Char* field = CATTO_NULL;
 
         if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
             catto_parseExpression(currentTokenPtr, &index);
@@ -3193,7 +3380,15 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
                 goto syntaxError;
             }
 
-            parsedAccessor = CATTO_TRUE;
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+                if (fieldToken) {
+                    field = catto_copyString(fieldToken->value.asString);
+                } else {
+                    return CATTO_NULL;
+                }
+            }
         }
 
         catto_Token* assignmentOperatorToken = catto_eatIfKeyword(currentTokenPtr, "=");
@@ -3203,6 +3398,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
 
             if (!catto_parseExpression(currentTokenPtr, &value)) {
                 CATTO_FREE(subject);
+                CATTO_FREE(field);
                 goto syntaxError;
             }
 
@@ -3212,6 +3408,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
             astNode->value.asStatement.firstArgument = value;
             astNode->value.asStatement.attributes.asAssignee.subjectVariable = subject;
             astNode->value.asStatement.attributes.asAssignee.index = index;
+            astNode->value.asStatement.attributes.asAssignee.field = field;
             astNode->value.asStatement.previousAstNode = lastAstNode;
 
             return astNode;
@@ -3435,6 +3632,7 @@ CATTO_FN_PREFIX void catto_freeAstNodes(catto_AstNode* firstAstNode) {
                 catto_freeAstNodes(currentAstNode->value.asStatement.attributes.asAssignee.index);
 
                 CATTO_FREE(currentAstNode->value.asStatement.attributes.asAssignee.subjectVariable);
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asAssignee.field);
 
                 break;
 
@@ -3445,6 +3643,7 @@ CATTO_FN_PREFIX void catto_freeAstNodes(catto_AstNode* firstAstNode) {
                 catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.index);
 
                 CATTO_FREE(currentAstNode->value.asExpressionLeaf.subjectVariable);
+                CATTO_FREE(currentAstNode->value.asExpressionLeaf.field);
 
                 break;
 
@@ -4037,91 +4236,166 @@ CATTO_FN_PREFIX void catto_command_dim(catto_Context* context) {
         return;
     }
 
+    catto_List* list = catto_newList();
+
+    while (catto_hasNextArg(context)) {
+        catto_AstNode* fieldIdentifier = catto_getNextArg(context);
+
+        if (fieldIdentifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+            return;
+        }
+
+        catto_addListField(list, fieldIdentifier->value.asExpressionLeaf.subjectVariable);
+    }
+
     catto_TypedValue listValue = {
         .type = CATTO_DATA_TYPE_LIST,
-        .value = {.asList = catto_newList()}
+        .value = {.asList = list}
     };
 
     catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);
 }
 
 CATTO_FN_PREFIX void catto_command_push(catto_Context* context) {
-    catto_TypedValue value = catto_evalNextArg(context);
-    catto_TypedValue listValue = catto_evalNextArg(context);
+    catto_AstNode* listArg = catto_getLastArg(context);
+    catto_TypedValue listValue = catto_evalExpression(context, listArg);
 
     if (listValue.type != CATTO_DATA_TYPE_LIST) {
         context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
         return;
     }
 
-    if (value.type == CATTO_DATA_TYPE_LIST) {
-        context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
-        return;
+    catto_List* list = listValue.value.asList;
+    catto_Count i = 0;
+
+    while (catto_hasNextArg(context)) {
+        catto_AstNode* arg = catto_getNextArg(context);
+
+        if (arg == listArg) {
+            break;
+        }
+
+        catto_TypedValue value = catto_evalExpression(context, arg);
+
+        if (value.type == CATTO_DATA_TYPE_LIST) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+            return;
+        }
+
+        catto_pushOntoList(list, value);
+
+        i++;
     }
 
-    catto_pushOntoList(listValue.value.asList, value);
+    while (list->fieldCount > 0 && i % list->fieldCount > 0) {
+        catto_pushOntoList(list, catto_asTypedNumber(0));
+        i++;
+    }
 }
 
 CATTO_FN_PREFIX void catto_command_pop(catto_Context* context) {
     catto_TypedValue listValue = catto_evalNextArg(context);
-    catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
 
     if (listValue.type != CATTO_DATA_TYPE_LIST) {
         context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
         return;
     }
 
-    catto_TypedValue poppedValue = catto_popFromList(context, listValue.value.asList);
+    catto_List* list = listValue.value.asList;
+    catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+    catto_Count removalIndex = list->length - fieldCount;
 
-    if (reassignedIdentifier) {
-        catto_assignValue(context, reassignedIdentifier, poppedValue);
+    for (catto_Count i = 0; i < fieldCount; i++) {
+        catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
+        catto_TypedValue poppedValue = catto_removeFromList(context, list, removalIndex);
+
+        if (reassignedIdentifier) {
+            catto_assignValue(context, reassignedIdentifier, poppedValue);
+        }
     }
 }
 
 CATTO_FN_PREFIX void catto_command_insert(catto_Context* context) {
-    catto_TypedValue value = catto_evalNextArg(context);
-    catto_TypedValue listValue = catto_evalNextArg(context);
-    catto_Int index = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+    catto_AstNode* listArg = catto_getPenultimateArg(context);
+    catto_TypedValue listValue = catto_evalExpression(context, listArg);
 
     if (listValue.type != CATTO_DATA_TYPE_LIST) {
         context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
         return;
     }
 
-    if (value.type == CATTO_DATA_TYPE_LIST) {
-        context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
-        return;
-    }
+    catto_List* list = listValue.value.asList;
+    catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+    catto_Int index = (catto_Int)catto_asNumber(catto_evalLastArg(context));
+    catto_Count i = 0;
 
     while (index < 0) {
-        index += listValue.value.asList->length;
+        index += listValue.value.asList->length / fieldCount;
     }
 
-    catto_insertIntoList(listValue.value.asList, value, index);
+    index *= fieldCount;
+
+    while (catto_hasNextArg(context)) {
+        catto_AstNode* arg = catto_getNextArg(context);
+
+        if (arg == listArg) {
+            break;
+        }
+
+        catto_TypedValue value = catto_evalExpression(context, arg);
+
+        if (value.type == CATTO_DATA_TYPE_LIST) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_LIST_VALUE;
+            return;
+        }
+
+        catto_insertIntoList(list, value, index + i);
+
+        i++;
+    }
+
+    while (list->fieldCount > 0 && i % list->fieldCount > 0) {
+        catto_insertIntoList(list, catto_asTypedNumber(0), index + i);
+        i++;
+    }
 }
 
 CATTO_FN_PREFIX void catto_command_remove(catto_Context* context) {
     catto_TypedValue listValue = catto_evalNextArg(context);
-    catto_Int index = (catto_Int)catto_asNumber(catto_evalNextArg(context));
-    catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
 
     if (listValue.type != CATTO_DATA_TYPE_LIST) {
         context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
         return;
     }
 
+    catto_List* list = listValue.value.asList;
+    catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+    catto_Int index = (catto_Int)catto_asNumber(catto_evalNextArg(context));
+
     while (index < 0) {
-        index += listValue.value.asList->length;
+        index += listValue.value.asList->length / fieldCount;
     }
 
-    catto_TypedValue removedValue = catto_removeFromList(context, listValue.value.asList, index);
+    index *= fieldCount;
 
-    if (reassignedIdentifier && reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        catto_assignValue(context, reassignedIdentifier, removedValue);
+    for (catto_Count i = 0; i < fieldCount; i++) {
+        catto_AstNode* reassignedIdentifier = catto_getNextArg(context);
+        catto_TypedValue removedValue = catto_removeFromList(context, listValue.value.asList, index);
+
+        if (reassignedIdentifier && reassignedIdentifier->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+            catto_assignValue(context, reassignedIdentifier, removedValue);
+        }
     }
 }
 
 // src/stdlib/functions.h
+
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFF
+#else
+    #define CATTO_RANDOM_MASK 0xFFFFFF
+#endif
 
 #define CATTO_TRIG_MODE_COMMAND(name, mode) CATTO_FN_PREFIX void name(catto_Context* context) { \
         context->trigMode = mode; \
@@ -4270,7 +4544,10 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_len(catto_Context* context, catt
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        return catto_asTypedNumber(value.value.asList->length);
+        catto_List* list = value.value.asList;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        return catto_asTypedNumber(list->length / fieldCount);
     }
 
     return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
@@ -4320,7 +4597,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
             continue;
         }
 
-        splitHere:
+        splitHere: ;
 
         catto_TypedValue typedString = catto_asTypedString(currentString);
 
@@ -4384,18 +4661,42 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_join(catto_Context* context, cat
 
 CATTO_FN_PREFIX catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
-    catto_TypedValue searchValue = catto_evalNextArg(context);
+    catto_AstNode* searchFieldArg = catto_getNextArg(context);
+    catto_AstNode* searchValueArg = catto_getNextArg(context);
+
+    if (!searchValueArg) {
+        searchValueArg = searchFieldArg;
+        searchFieldArg = CATTO_NULL;
+    }
+
+    catto_TypedValue searchValue = catto_evalExpression(context, searchValueArg);
 
     if (sequence.type == CATTO_DATA_TYPE_LIST) {
         catto_List* list = sequence.value.asList;
+        catto_Char* field = searchFieldArg ? catto_asString(catto_evalExpression(context, searchFieldArg)) : CATTO_NULL;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        if (field && list->fieldCount == 0) {
+            CATTO_FREE(field);
+
+            return catto_asTypedNumber(-1);
+        }
 
         for (catto_Count i = 0; i < list->length; i++) {
+            if (field && !catto_stringsEqual(field, list->fields[i % fieldCount])) {
+                continue;
+            }
+
             catto_TypedValue item = list->values[i];
 
             if (catto_asNumber(catto_binary_equal(context, item, searchValue))) {
-                return catto_asTypedNumber(i);
+                CATTO_FREE(field);
+
+                return catto_asTypedNumber(i / fieldCount);
             }
         }
+
+        CATTO_FREE(field);
 
         return catto_asTypedNumber(-1);
     }
@@ -4556,6 +4857,62 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_rtrim(catto_Context* context, ca
     return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
 }
 
+CATTO_FN_PREFIX catto_TypedValue catto_function_lpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString("");
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    result = catto_appendToString(result, value);
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+CATTO_FN_PREFIX catto_TypedValue catto_function_rpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString(value);
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
 CATTO_FN_PREFIX catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Int repeatCount = catto_asNumber(catto_evalNextArg(context));
@@ -4574,11 +4931,11 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_repeat(catto_Context* context, c
 }
 
 CATTO_FN_PREFIX catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
-    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & CATTO_RANDOM_MASK;
 
     catto_Float value = context->randomSeed;
 
-    return catto_asTypedNumber(value / 0xFFFF);
+    return catto_asTypedNumber(value / CATTO_RANDOM_MASK);
 }
 
 // src/stdlib/stdlib.h
@@ -4660,6 +5017,8 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_addFunction(context, "trim", &catto_function_trim);
     catto_addFunction(context, "ltrim", &catto_function_ltrim);
     catto_addFunction(context, "rtrim", &catto_function_rtrim);
+    catto_addFunction(context, "lpad", &catto_function_lpad);
+    catto_addFunction(context, "rpad", &catto_function_rpad);
     catto_addFunction(context, "repeat", &catto_function_repeat);
     catto_addFunction(context, "random", &catto_function_random);
 

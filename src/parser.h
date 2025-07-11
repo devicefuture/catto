@@ -63,6 +63,7 @@ catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode*
     astNode->value.asExpressionLeaf.subjectVariable = CATTO_NULL;
     astNode->value.asExpressionLeaf.firstArgument = CATTO_NULL;
     astNode->value.asExpressionLeaf.index = CATTO_NULL;
+    astNode->value.asExpressionLeaf.field = CATTO_NULL;
 
     return astNode;
 }
@@ -86,6 +87,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     catto_Char* subjectVariable = CATTO_NULL;
     catto_AstNode* firstArgument = CATTO_NULL;
     catto_AstNode* index = CATTO_NULL;
+    catto_Char* field = CATTO_NULL;
 
     switch (token->type) {
         case CATTO_TOKEN_TYPE_NUMBER:
@@ -137,6 +139,16 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
                 if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_CLOSING_ACCESSOR_BRACKET)) {
                     return CATTO_NULL;
                 }
+
+                if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                    catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+                    if (fieldToken) {
+                        field = catto_copyString(fieldToken->value.asString);
+                    } else {
+                        return CATTO_NULL;
+                    }
+                }
             }
 
             break;
@@ -151,6 +163,7 @@ catto_AstNode* catto_parseExpressionLeaf(catto_Token** currentTokenPtr, catto_As
     astNode->value.asExpressionLeaf.subjectVariable = subjectVariable;
     astNode->value.asExpressionLeaf.firstArgument = firstArgument;
     astNode->value.asExpressionLeaf.index = index;
+    astNode->value.asExpressionLeaf.field = field;
     astNode->value.asExpressionLeaf.appendFlag = CATTO_FALSE;
 
     catto_Token* tokenPtrAfter = *currentTokenPtr ? (*currentTokenPtr)->nextToken : CATTO_NULL;
@@ -412,6 +425,12 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
         }
 
+        if (catto_stringsEqualCaseInsensitive(commandName, "dim")) {
+            firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
+
+            catto_eatIfKeyword(currentTokenPtr, "with");
+        }
+
         finishAstNode:
 
         while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
@@ -434,7 +453,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     if (identifierToken) {
         catto_Char* subject = catto_copyString(identifierToken->value.asString);
         catto_AstNode* index = CATTO_NULL;
-        catto_Bool parsedAccessor = CATTO_FALSE;
+        catto_Char* field = CATTO_NULL;
 
         if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_OPENING_ACCESSOR_BRACKET)) {
             catto_parseExpression(currentTokenPtr, &index);
@@ -444,7 +463,15 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
                 goto syntaxError;
             }
 
-            parsedAccessor = CATTO_TRUE;
+            if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR)) {
+                catto_Token* fieldToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+                if (fieldToken) {
+                    field = catto_copyString(fieldToken->value.asString);
+                } else {
+                    return CATTO_NULL;
+                }
+            }
         }
 
         catto_Token* assignmentOperatorToken = catto_eatIfKeyword(currentTokenPtr, "=");
@@ -454,6 +481,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
             if (!catto_parseExpression(currentTokenPtr, &value)) {
                 CATTO_FREE(subject);
+                CATTO_FREE(field);
                 goto syntaxError;
             }
 
@@ -463,6 +491,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             astNode->value.asStatement.firstArgument = value;
             astNode->value.asStatement.attributes.asAssignee.subjectVariable = subject;
             astNode->value.asStatement.attributes.asAssignee.index = index;
+            astNode->value.asStatement.attributes.asAssignee.field = field;
             astNode->value.asStatement.previousAstNode = lastAstNode;
 
             return astNode;
@@ -686,6 +715,7 @@ void catto_freeAstNodes(catto_AstNode* firstAstNode) {
                 catto_freeAstNodes(currentAstNode->value.asStatement.attributes.asAssignee.index);
 
                 CATTO_FREE(currentAstNode->value.asStatement.attributes.asAssignee.subjectVariable);
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asAssignee.field);
 
                 break;
 
@@ -696,6 +726,7 @@ void catto_freeAstNodes(catto_AstNode* firstAstNode) {
                 catto_freeAstNodes(currentAstNode->value.asExpressionLeaf.index);
 
                 CATTO_FREE(currentAstNode->value.asExpressionLeaf.subjectVariable);
+                CATTO_FREE(currentAstNode->value.asExpressionLeaf.field);
 
                 break;
 

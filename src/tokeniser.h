@@ -56,7 +56,7 @@ catto_Token* catto_matchLineNumber(const catto_Char* code, catto_Count* indexPtr
 catto_Token* catto_matchComment(const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
 
-    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem"))) {
+    if (!(code[index] == '#' || catto_stringStartsWithCaseInsensitive(code + index, "rem "))) {
         return CATTO_NULL;
     }
 
@@ -124,7 +124,7 @@ catto_Token* catto_matchCommand(catto_Context* context, const catto_Char* code, 
     return CATTO_NULL;
 }
 
-catto_Token* catto_matchStrings(const catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
+catto_Token* catto_matchStrings(catto_Context* context, const catto_Char** matchStrings, catto_TokenType type, catto_Bool caseInsensitive, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
     catto_Count i = 0;
 
@@ -132,6 +132,12 @@ catto_Token* catto_matchStrings(const catto_Char** matchStrings, catto_TokenType
         const catto_Char* currentString = matchStrings[i];
 
         if (_catto_stringStartsWith(code + index, currentString, caseInsensitive)) {
+            catto_Count newIndex = index + catto_stringLength(currentString);
+
+            if (!context->scrawlMode && !catto_onWordBoundary(code, newIndex - 1) && !catto_onWordBoundary(code, newIndex)) {
+                goto skipMatch;
+            }
+
             catto_Token* token = catto_addToken(type, currentTokenPtr);
 
             token->value.asConstString = currentString;
@@ -140,6 +146,8 @@ catto_Token* catto_matchStrings(const catto_Char** matchStrings, catto_TokenType
 
             return token;
         }
+
+        skipMatch:
 
         i++;
     }
@@ -340,7 +348,7 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
             continue;
         }
 
-        if (catto_matchStrings(catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
+        if (catto_matchStrings(context, catto_operators, CATTO_TOKEN_TYPE_OPERATOR, CATTO_TRUE, code, &index, &currentToken)) {
             continue;
         }
 
@@ -357,6 +365,10 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
         }
 
         if (catto_matchNumber(code, &index, &currentToken)) {
+            continue;
+        }
+
+        if (catto_matchChar('.', CATTO_TOKEN_TYPE_FIELD_ACCESSOR, code, &index, &currentToken)) {
             continue;
         }
 

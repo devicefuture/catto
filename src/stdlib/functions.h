@@ -1,3 +1,9 @@
+#ifdef CATTO_USE_64_BIT
+    #define CATTO_RANDOM_MASK 0xFFFFFFFFFFFFF
+#else
+    #define CATTO_RANDOM_MASK 0xFFFFFF
+#endif
+
 #define CATTO_TRIG_MODE_COMMAND(name, mode) void name(catto_Context* context) { \
         context->trigMode = mode; \
     }
@@ -145,7 +151,10 @@ catto_TypedValue catto_function_len(catto_Context* context, catto_DataType retur
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        return catto_asTypedNumber(value.value.asList->length);
+        catto_List* list = value.value.asList;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        return catto_asTypedNumber(list->length / fieldCount);
     }
 
     return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
@@ -195,7 +204,7 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
             continue;
         }
 
-        splitHere:
+        splitHere: ;
 
         catto_TypedValue typedString = catto_asTypedString(currentString);
 
@@ -259,18 +268,42 @@ catto_TypedValue catto_function_join(catto_Context* context, catto_DataType retu
 
 catto_TypedValue catto_function_find(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue sequence = catto_evalNextArg(context);
-    catto_TypedValue searchValue = catto_evalNextArg(context);
+    catto_AstNode* searchFieldArg = catto_getNextArg(context);
+    catto_AstNode* searchValueArg = catto_getNextArg(context);
+
+    if (!searchValueArg) {
+        searchValueArg = searchFieldArg;
+        searchFieldArg = CATTO_NULL;
+    }
+
+    catto_TypedValue searchValue = catto_evalExpression(context, searchValueArg);
 
     if (sequence.type == CATTO_DATA_TYPE_LIST) {
         catto_List* list = sequence.value.asList;
+        catto_Char* field = searchFieldArg ? catto_asString(catto_evalExpression(context, searchFieldArg)) : CATTO_NULL;
+        catto_Count fieldCount = list->fieldCount > 0 ? list->fieldCount : 1;
+
+        if (field && list->fieldCount == 0) {
+            CATTO_FREE(field);
+
+            return catto_asTypedNumber(-1);
+        }
 
         for (catto_Count i = 0; i < list->length; i++) {
+            if (field && !catto_stringsEqual(field, list->fields[i % fieldCount])) {
+                continue;
+            }
+
             catto_TypedValue item = list->values[i];
 
             if (catto_asNumber(catto_binary_equal(context, item, searchValue))) {
-                return catto_asTypedNumber(i);
+                CATTO_FREE(field);
+
+                return catto_asTypedNumber(i / fieldCount);
             }
         }
+
+        CATTO_FREE(field);
 
         return catto_asTypedNumber(-1);
     }
@@ -431,6 +464,62 @@ catto_TypedValue catto_function_rtrim(catto_Context* context, catto_DataType ret
     return catto_function_trimmer(context, CATTO_FALSE, CATTO_TRUE, returnType);
 }
 
+catto_TypedValue catto_function_lpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString("");
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    result = catto_appendToString(result, value);
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
+catto_TypedValue catto_function_rpad(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context));
+    catto_Int minLength = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* padding = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString(" ");
+    catto_Count paddingLength = catto_stringLength(padding);
+    catto_Char* result = catto_copyString(value);
+
+    if (paddingLength == 0) {
+        CATTO_FREE(padding);
+
+        padding = catto_copyString(" ");
+        paddingLength = 1;
+    }
+
+    for (catto_Int i = catto_stringLength(value); i < minLength; i += paddingLength) {
+        result = catto_appendToString(result, padding);
+    }
+
+    catto_TypedValue returnValue = catto_asTypedString(result);
+
+    CATTO_FREE(value);
+    CATTO_FREE(padding);
+    CATTO_FREE(result);
+
+    return returnValue;
+}
+
 catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType returnType) {
     catto_Char* value = catto_asString(catto_evalNextArg(context));
     catto_Int repeatCount = catto_asNumber(catto_evalNextArg(context));
@@ -449,9 +538,9 @@ catto_TypedValue catto_function_repeat(catto_Context* context, catto_DataType re
 }
 
 catto_TypedValue catto_function_random(catto_Context* context, catto_DataType returnType) {
-    context->randomSeed = ((context->randomSeed * 10753) + 23279) & 0xFFFF;
+    context->randomSeed = ((context->randomSeed * 10753) + 23279) & CATTO_RANDOM_MASK;
 
     catto_Float value = context->randomSeed;
 
-    return catto_asTypedNumber(value / 0xFFFF);
+    return catto_asTypedNumber(value / CATTO_RANDOM_MASK);
 }
