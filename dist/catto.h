@@ -113,6 +113,9 @@ typedef enum {
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
+    CATTO_ERROR_STATE_EXTENSION_NOT_LOADED,
+    CATTO_ERROR_STATE_UNKNOWN_EXTENSION,
+    CATTO_ERROR_STATE_UNKNOWN_EXTENSION_COMMAND,
     CATTO_ERROR_STATE_UNKNOWN_PROCEDURE,
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
@@ -144,6 +147,8 @@ typedef enum {
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
+    struct cattox_Extension* firstExtension;
+    struct cattox_Extension* lastExtension;
     struct catto_Variable* firstVariable;
     struct catto_Variable* lastVariable;
     struct catto_Procedure* firstProcedure;
@@ -174,6 +179,14 @@ typedef struct catto_CommandHandler {
     catto_CommandHandlerFunction function;
     struct catto_CommandHandler* nextCommandHandler;
 } catto_CommandHandler;
+
+typedef struct cattox_Extension {
+    const catto_Char* name;
+    catto_Char* alias;
+    catto_CommandHandler* firstCommandHandler;
+    catto_CommandHandler* lastCommandHandler;
+    struct cattox_Extension* nextExtension;
+} cattox_Extension;
 
 typedef enum {
     CATTO_TOKEN_TYPE_SYNTAX_ERROR = '\0',
@@ -245,6 +258,7 @@ typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_NOOP = 'n',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
+    CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT = 'x',
     CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT = 'p',
     CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT = '=',
     CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
@@ -260,6 +274,10 @@ typedef struct catto_AstNode {
             struct catto_AstNode* firstArgument;
             union {
                 catto_CommandHandler* asCommandHandler;
+                struct {
+                    catto_Char* extensionName;
+                    catto_Char* commandName;
+                } asExtensionCommand;
                 struct {
                     catto_Char* subjectVariable;
                     struct catto_AstNode* index;
@@ -321,6 +339,7 @@ catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
 catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
+catto_Char* catto_getIdentifierName(catto_AstNode* astNode);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_AstNode* catto_getNextArg(catto_Context* context);
@@ -411,6 +430,81 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, const catto_Char* m
 catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, const catto_Char* mark, catto_MarkSearchMode searchMode);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
+
+cattox_Extension* cattox_newExtension(catto_Context* context, const catto_Char* name);
+cattox_Extension* cattox_findExtension(catto_Context* context, const catto_Char* name, catto_Bool useAlias);
+catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* extension, const catto_Char* command);
+void cattox_addExtensionCommand(cattox_Extension* extension, const catto_Char* name, catto_CommandHandlerFunction function);
+
+// src/cattox.h
+
+CATTO_FN_PREFIX cattox_Extension* cattox_newExtension(catto_Context* context, const catto_Char* name) {
+    cattox_Extension* extension = CATTO_NEW(cattox_Extension);
+
+    extension->name = name;
+    extension->alias = CATTO_NULL;
+    extension->firstCommandHandler = CATTO_NULL;
+    extension->lastCommandHandler = CATTO_NULL;
+    extension->nextExtension = CATTO_NULL;
+
+    if (!context->firstExtension) {
+        context->firstExtension = extension;
+    }
+
+    if (context->lastExtension) {
+        context->lastExtension->nextExtension = extension;
+    }
+
+    context->lastExtension = extension;
+
+    return extension;
+}
+
+CATTO_FN_PREFIX cattox_Extension* cattox_findExtension(catto_Context* context, const catto_Char* name, catto_Bool useAlias) {
+    cattox_Extension* extension = context->firstExtension;
+
+    while (extension) {
+        if (!useAlias && catto_stringsEqualCaseInsensitive(extension->name, name)) {
+            return extension;
+        }
+
+        if (useAlias && catto_stringsEqualCaseInsensitive(extension->alias, name)) {
+            return extension;
+        }
+
+        extension = extension->nextExtension;
+    }
+}
+
+CATTO_FN_PREFIX catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* extension, const catto_Char* command) {
+    catto_CommandHandler* commandHandler = extension->firstCommandHandler;
+
+    while (commandHandler) {
+        if (catto_stringsEqualCaseInsensitive(commandHandler->name, command)) {
+            return commandHandler;
+        }
+
+        commandHandler = commandHandler->nextCommandHandler;
+    }
+}
+
+CATTO_FN_PREFIX void cattox_addExtensionCommand(cattox_Extension* extension, const catto_Char* name, catto_CommandHandlerFunction function) {
+    catto_CommandHandler* commandHandler = CATTO_NEW(catto_CommandHandler);
+
+    commandHandler->name = name;
+    commandHandler->function = function;
+    commandHandler->nextCommandHandler = CATTO_NULL;
+
+    if (!extension->firstCommandHandler) {
+        extension->firstCommandHandler = commandHandler;
+    }
+
+    if (extension->lastCommandHandler) {
+        extension->lastCommandHandler->nextCommandHandler = commandHandler;
+    }
+
+    extension->lastCommandHandler = commandHandler;
+}
 
 // src/operators.h
 
@@ -566,6 +660,8 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
 
     context->firstCommandHandler = CATTO_NULL;
     context->lastCommandHandler = CATTO_NULL;
+    context->firstExtension = CATTO_NULL;
+    context->lastExtension = CATTO_NULL;
     context->firstVariable = CATTO_NULL;
     context->lastVariable = CATTO_NULL;
     context->firstProcedure = CATTO_NULL;
@@ -601,6 +697,26 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
         CATTO_FREE(commandHandler);
 
         commandHandler = nextCommandHandler;
+    }
+
+    cattox_Extension* extension = context->firstExtension;
+
+    while (extension) {
+        cattox_Extension* nextExtension = extension->nextExtension;
+        catto_CommandHandler* extensionCommandHandler = extension->firstCommandHandler;
+
+        while (extensionCommandHandler) {
+            catto_CommandHandler* nextExtensionCommandHandler = extensionCommandHandler->nextCommandHandler;
+
+            CATTO_FREE(extensionCommandHandler);
+
+            extensionCommandHandler = nextExtensionCommandHandler;
+        }
+
+        CATTO_FREE(extension->alias);
+        CATTO_FREE(extension);
+
+        extension = nextExtension;
     }
 
     catto_Variable* variable = context->firstVariable;
@@ -937,6 +1053,18 @@ CATTO_FN_PREFIX void catto_assignValue(catto_Context* context, catto_AstNode* as
     catto_setVariable(context, name, value);
 }
 
+CATTO_FN_PREFIX catto_Char* catto_getIdentifierName(catto_AstNode* astNode) {
+    if (!astNode) {
+        return CATTO_NULL;
+    }
+
+    if (astNode->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        return CATTO_NULL;
+    }
+
+    return astNode->value.asExpressionLeaf.subjectVariable;
+}
+
 CATTO_FN_PREFIX catto_Bool catto_hasNextArg(catto_Context* context) {
     return !!context->nextParsedArgument;
 }
@@ -1197,6 +1325,35 @@ CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
 
             if (!commandHandler) {
                 context->errorState = CATTO_ERROR_STATE_UNKNOWN_PROCEDURE;
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandlerFunction function = commandHandler->function;
+
+            if (!function) {
+                return CATTO_FALSE;
+            }
+
+            function(context);
+
+            break;
+        }
+
+        case CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT:
+        {
+            catto_Char* extensionName = currentStatement->value.asStatement.attributes.asExtensionCommand.extensionName;
+            catto_Char* commandName = currentStatement->value.asStatement.attributes.asExtensionCommand.commandName;
+            cattox_Extension* extension = cattox_findExtension(context, extensionName, CATTO_TRUE);
+
+            if (!extension) {
+                context->errorState = CATTO_ERROR_STATE_EXTENSION_NOT_LOADED;
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandler* commandHandler = cattox_findCommandHandlerInExtension(extension, commandName);
+
+            if (!commandHandler) {
+                context->errorState = CATTO_ERROR_STATE_UNKNOWN_EXTENSION_COMMAND;
                 return CATTO_FALSE;
             }
 
@@ -1704,7 +1861,7 @@ CATTO_FN_PREFIX catto_Float catto_roundToPrecision(catto_Float number, catto_Cou
 
     catto_Int multiplier = catto_power(10, precision);
 
-    number += 0.5 * catto_power(10, -(catto_Int)precision);
+    number += 0.1 * catto_power(10, -(catto_Int)precision);
 
     if (isNegative) {
         number *= -1;
@@ -1899,6 +2056,10 @@ CATTO_FN_PREFIX catto_Bool _catto_stringsEqual(const catto_Char* a, const catto_
 
     if (a == b) {
         return CATTO_TRUE;
+    }
+
+    if (!a || !b) {
+        return CATTO_FALSE;
     }
 
     while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
@@ -3285,11 +3446,12 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
 
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+    catto_AstNode* astNode;
     catto_AstNode* lastAstNode = *currentAstNodePtr;
     catto_Bool noop = CATTO_FALSE;
 
     if (commandToken) {
-        catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
+        astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
 
         astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
         astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
@@ -3340,6 +3502,12 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
 
         if (catto_stringsEqualCaseInsensitive(commandName, "while") || catto_stringsEqualCaseInsensitive(commandName, "until")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
+        }
+
+        if (catto_stringsEqualCaseInsensitive(commandName, "extload")) {
+            firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
+
+            catto_eatIfKeyword(currentTokenPtr, "as");
         }
 
         if (catto_stringsEqualCaseInsensitive(commandName, "dim")) {
@@ -3402,7 +3570,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
                 goto syntaxError;
             }
 
-            catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
 
             astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
             astNode->value.asStatement.firstArgument = value;
@@ -3412,35 +3580,53 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseStatement(catto_Token** currentTokenPt
             astNode->value.asStatement.previousAstNode = lastAstNode;
 
             return astNode;
-        } else {
-            catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT, currentAstNodePtr);
-            catto_AstNode* firstArgument = CATTO_NULL;
-            catto_AstNode* currentArgument = CATTO_NULL;
+        }
 
-            while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
-                if (!firstArgument) {
-                    firstArgument = currentArgument;
-                }
+        catto_Token* extensionAccessor = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR);
 
-                if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
-                    break;
-                }
+        if (extensionAccessor) {
+            catto_Token* commandNameToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+            if (!commandNameToken) {
+                CATTO_FREE(subject);
+                goto syntaxError;
             }
 
-            astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
-            astNode->value.asStatement.firstArgument = firstArgument;
-            astNode->value.asStatement.attributes.asProcedure.name = subject;
-            astNode->value.asStatement.previousAstNode = lastAstNode;
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT, currentAstNodePtr);
 
-            return astNode;
+            astNode->value.asStatement.attributes.asExtensionCommand.extensionName = subject;
+            astNode->value.asStatement.attributes.asExtensionCommand.commandName = catto_copyString(commandNameToken->value.asString);
+        } else {
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT, currentAstNodePtr);
+
+            astNode->value.asStatement.attributes.asProcedure.name = subject;
         }
+
+        catto_AstNode* firstArgument = CATTO_NULL;
+        catto_AstNode* currentArgument = CATTO_NULL;
+
+        while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
+            if (!firstArgument) {
+                firstArgument = currentArgument;
+            }
+
+            if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
+                break;
+            }
+        }
+
+        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.firstArgument = firstArgument;
+        astNode->value.asStatement.previousAstNode = lastAstNode;
+
+        return astNode;
     }
 
     noop = CATTO_TRUE;
 
     syntaxError: ;
 
-    catto_AstNode* astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
+    astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
     astNode->value.asStatement.previousAstNode = lastAstNode;
@@ -3620,6 +3806,14 @@ CATTO_FN_PREFIX void catto_freeAstNodes(catto_AstNode* firstAstNode) {
                 catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
                 break;
 
+            case CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT:
+                catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
+
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asExtensionCommand.extensionName);
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asExtensionCommand.commandName);
+
+                break;
+
             case CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT:
                 catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
 
@@ -3796,15 +3990,10 @@ CATTO_FN_PREFIX void catto_command_gosub(catto_Context* context) {
 }
 
 CATTO_FN_PREFIX void catto_command_def(catto_Context* context) {
-    catto_AstNode* name = catto_getNextArg(context);
-    catto_Char* subject;
+    catto_Char* subject = catto_getIdentifierName(catto_getNextArg(context));
 
-    if (
-        !name ||
-        name->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
-        !(subject = name->value.asExpressionLeaf.subjectVariable)
-    ) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+    if (!subject) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
         return;
     }
 
@@ -3829,15 +4018,10 @@ CATTO_FN_PREFIX void catto_command_def(catto_Context* context) {
     }
 
     while (catto_hasNextArg(context)) {
-        catto_AstNode* parameterName = catto_getNextArg(context);
-        catto_Char* parameter;
+        catto_Char* parameter = catto_getIdentifierName(catto_getNextArg(context));
 
-        if (
-            !parameterName ||
-            parameterName->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
-            !(parameter = parameterName->value.asExpressionLeaf.subjectVariable)
-        ) {
-            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        if (!parameter) {
+            context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
             return;
         }
 
@@ -4226,27 +4410,53 @@ CATTO_FN_PREFIX void catto_command_noscrawl(catto_Context* context) {
     context->scrawlMode = CATTO_FALSE;
 }
 
+CATTO_FN_PREFIX void catto_command_extload(catto_Context* context) {
+    catto_Char* nameIdentifier = catto_getIdentifierName(catto_getNextArg(context));
+    catto_Char* name = nameIdentifier ? catto_copyString(nameIdentifier) : catto_asString(catto_evalNextArg(context));
+
+    cattox_Extension* extension = cattox_findExtension(context, name, CATTO_FALSE);
+
+    if (extension->alias) {
+        CATTO_FREE(extension->alias);
+    }
+
+    catto_AstNode* aliasArg = catto_getNextArg(context);
+
+    if (aliasArg) {
+        catto_Char* aliasIdentifier = catto_copyString(catto_getIdentifierName(aliasArg));
+        catto_Char* alias = aliasIdentifier ? aliasIdentifier : catto_asString(catto_evalNextArg(context));
+
+        extension->alias = catto_copyString(alias);
+
+        CATTO_FREE(alias);
+    } else {
+        extension->alias = catto_copyString(name);
+    }
+
+    CATTO_FREE(name);
+}
+
 // src/stdlib/lists.h
 
 CATTO_FN_PREFIX void catto_command_dim(catto_Context* context) {
-    catto_AstNode* identifier = catto_getNextArg(context);
+    catto_Char* identifier = catto_getIdentifierName(catto_getNextArg(context));
 
-    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+    if (!identifier) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
         return;
     }
 
     catto_List* list = catto_newList();
 
     while (catto_hasNextArg(context)) {
-        catto_AstNode* fieldIdentifier = catto_getNextArg(context);
+        catto_Char* fieldIdentifier = catto_getIdentifierName(catto_getNextArg(context));
 
-        if (fieldIdentifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        if (!fieldIdentifier) {
+            context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
             return;
         }
 
-        catto_addListField(list, fieldIdentifier->value.asExpressionLeaf.subjectVariable);
+        catto_addListField(list, fieldIdentifier);
     }
 
     catto_TypedValue listValue = {
@@ -4254,7 +4464,7 @@ CATTO_FN_PREFIX void catto_command_dim(catto_Context* context) {
         .value = {.asList = list}
     };
 
-    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);
+    catto_setVariable(context, identifier, listValue);
 }
 
 CATTO_FN_PREFIX void catto_command_push(catto_Context* context) {
@@ -4968,6 +5178,7 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
 
     catto_addCommand(context, "scrawl", &catto_command_scrawl);
     catto_addCommand(context, "noscrawl", &catto_command_noscrawl);
+    catto_addCommand(context, "extload", &catto_command_extload);
 
     // Lists
 
@@ -5030,5 +5241,35 @@ CATTO_FN_PREFIX void catto_addContextStandardCommands(catto_Context* context) {
     catto_setVariable(context, "e", catto_asTypedNumber(CATTO_E));
     catto_setVariable(context, "phi", catto_asTypedNumber(CATTO_PHI));
 }
+
+// src/extensions/test.h
+
+#ifndef CATTOX_NO_TEST
+
+CATTO_FN_PREFIX void cattox_test_hello(catto_Context* context) {
+    CATTO_LOG("Hi there!\n");
+}
+
+CATTO_FN_PREFIX void cattox_test_add(catto_Context* context) {
+    catto_Float a = catto_asNumber(catto_evalNextArg(context));
+    catto_Float b = catto_asNumber(catto_evalNextArg(context));
+    catto_Char* identifier = catto_getIdentifierName(catto_getNextArg(context));
+
+    if (!identifier) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
+        return;
+    }
+
+    catto_setVariable(context, identifier, catto_asTypedNumber(a + b));
+}
+
+CATTO_FN_PREFIX void cattox_test_init(catto_Context* context) {
+    cattox_Extension* extension = cattox_newExtension(context, "test");
+
+    cattox_addExtensionCommand(extension, "hello", cattox_test_hello);
+    cattox_addExtensionCommand(extension, "add", cattox_test_add);
+}
+
+#endif
 
 #endif

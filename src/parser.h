@@ -368,11 +368,12 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+    catto_AstNode* astNode;
     catto_AstNode* lastAstNode = *currentAstNodePtr;
     catto_Bool noop = CATTO_FALSE;
 
     if (commandToken) {
-        catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
+        astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
 
         astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
         astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
@@ -423,6 +424,12 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
         if (catto_stringsEqualCaseInsensitive(commandName, "while") || catto_stringsEqualCaseInsensitive(commandName, "until")) {
             firstArgument = catto_createExpressionLeaf(catto_asTypedNumber(0), &currentArgument);
+        }
+
+        if (catto_stringsEqualCaseInsensitive(commandName, "extload")) {
+            firstArgument = catto_parseExpressionLeaf(currentTokenPtr, &currentArgument);
+
+            catto_eatIfKeyword(currentTokenPtr, "as");
         }
 
         if (catto_stringsEqualCaseInsensitive(commandName, "dim")) {
@@ -485,7 +492,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
                 goto syntaxError;
             }
 
-            catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
 
             astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
             astNode->value.asStatement.firstArgument = value;
@@ -495,35 +502,53 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             astNode->value.asStatement.previousAstNode = lastAstNode;
 
             return astNode;
-        } else {
-            catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT, currentAstNodePtr);
-            catto_AstNode* firstArgument = CATTO_NULL;
-            catto_AstNode* currentArgument = CATTO_NULL;
+        }
 
-            while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
-                if (!firstArgument) {
-                    firstArgument = currentArgument;
-                }
+        catto_Token* extensionAccessor = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_FIELD_ACCESSOR);
 
-                if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
-                    break;
-                }
+        if (extensionAccessor) {
+            catto_Token* commandNameToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_IDENTIFIER);
+
+            if (!commandNameToken) {
+                CATTO_FREE(subject);
+                goto syntaxError;
             }
 
-            astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
-            astNode->value.asStatement.firstArgument = firstArgument;
-            astNode->value.asStatement.attributes.asProcedure.name = subject;
-            astNode->value.asStatement.previousAstNode = lastAstNode;
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT, currentAstNodePtr);
 
-            return astNode;
+            astNode->value.asStatement.attributes.asExtensionCommand.extensionName = subject;
+            astNode->value.asStatement.attributes.asExtensionCommand.commandName = catto_copyString(commandNameToken->value.asString);
+        } else {
+            astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT, currentAstNodePtr);
+
+            astNode->value.asStatement.attributes.asProcedure.name = subject;
         }
+
+        catto_AstNode* firstArgument = CATTO_NULL;
+        catto_AstNode* currentArgument = CATTO_NULL;
+
+        while (catto_parseExpression(currentTokenPtr, &currentArgument)) {
+            if (!firstArgument) {
+                firstArgument = currentArgument;
+            }
+
+            if (!catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_DELIMETER)) {
+                break;
+            }
+        }
+
+        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.firstArgument = firstArgument;
+        astNode->value.asStatement.previousAstNode = lastAstNode;
+
+        return astNode;
     }
 
     noop = CATTO_TRUE;
 
     syntaxError: ;
 
-    catto_AstNode* astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
+    astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
     astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
     astNode->value.asStatement.previousAstNode = lastAstNode;
@@ -701,6 +726,14 @@ void catto_freeAstNodes(catto_AstNode* firstAstNode) {
         switch (currentAstNode->type) {
             case CATTO_AST_NODE_TYPE_COMMAND_STATEMENT:
                 catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
+                break;
+
+            case CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT:
+                catto_freeAstNodes(currentAstNode->value.asStatement.firstArgument);
+
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asExtensionCommand.extensionName);
+                CATTO_FREE(currentAstNode->value.asStatement.attributes.asExtensionCommand.commandName);
+
                 break;
 
             case CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT:

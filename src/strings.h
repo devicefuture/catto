@@ -32,6 +32,10 @@ catto_Bool _catto_stringsEqual(const catto_Char* a, const catto_Char* b, catto_B
         return CATTO_TRUE;
     }
 
+    if (!a || !b) {
+        return CATTO_FALSE;
+    }
+
     while (_catto_charsEqual(a[i], b[i], caseInsensitive)) {
         if (a[i] == '\0') {
             if (b[i] == '\0') {

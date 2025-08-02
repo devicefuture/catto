@@ -117,6 +117,9 @@ void runCode(catto_Context* context, char* code) {
         case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
         case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
         case CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP: message = "Loop control command was used outside of loop"; break;
+        case CATTO_ERROR_STATE_EXTENSION_NOT_LOADED: message = "No extensions with this name have been loaded"; break;
+        case CATTO_ERROR_STATE_UNKNOWN_EXTENSION: message = "Extension is not supported"; break;
+        case CATTO_ERROR_STATE_UNKNOWN_EXTENSION_COMMAND: message = "Cannot find command in loaded extension"; break;
         case CATTO_ERROR_STATE_UNKNOWN_PROCEDURE: message = "Procedure is not defined"; break;
         case CATTO_ERROR_STATE_NOT_A_FUNCTION: message = "Attempt to call variable that is not a function"; break;
         case CATTO_ERROR_STATE_NOT_A_LIST: message = "Cannot perform list operation on non-list variable"; break;
@@ -246,6 +249,8 @@ int main(int argc, char* argv[]) {
     catto_addCommand(context, "cls", &clsCommand);
     catto_addCommand(context, "pos", &posCommand);
     catto_addFunction(context, "epoch", &epochFunction);
+
+    cattox_test_init(context);
 
     if (argc >= 2) {
         FILE* fp = fopen(argv[1], "r");

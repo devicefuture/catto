@@ -3,6 +3,8 @@ catto_Context* catto_newContext() {
 
     context->firstCommandHandler = CATTO_NULL;
     context->lastCommandHandler = CATTO_NULL;
+    context->firstExtension = CATTO_NULL;
+    context->lastExtension = CATTO_NULL;
     context->firstVariable = CATTO_NULL;
     context->lastVariable = CATTO_NULL;
     context->firstProcedure = CATTO_NULL;
@@ -38,6 +40,26 @@ void catto_freeContext(catto_Context* context) {
         CATTO_FREE(commandHandler);
 
         commandHandler = nextCommandHandler;
+    }
+
+    cattox_Extension* extension = context->firstExtension;
+
+    while (extension) {
+        cattox_Extension* nextExtension = extension->nextExtension;
+        catto_CommandHandler* extensionCommandHandler = extension->firstCommandHandler;
+
+        while (extensionCommandHandler) {
+            catto_CommandHandler* nextExtensionCommandHandler = extensionCommandHandler->nextCommandHandler;
+
+            CATTO_FREE(extensionCommandHandler);
+
+            extensionCommandHandler = nextExtensionCommandHandler;
+        }
+
+        CATTO_FREE(extension->alias);
+        CATTO_FREE(extension);
+
+        extension = nextExtension;
     }
 
     catto_Variable* variable = context->firstVariable;
@@ -374,6 +396,18 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
     catto_setVariable(context, name, value);
 }
 
+catto_Char* catto_getIdentifierName(catto_AstNode* astNode) {
+    if (!astNode) {
+        return CATTO_NULL;
+    }
+
+    if (astNode->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
+        return CATTO_NULL;
+    }
+
+    return astNode->value.asExpressionLeaf.subjectVariable;
+}
+
 catto_Bool catto_hasNextArg(catto_Context* context) {
     return !!context->nextParsedArgument;
 }
@@ -634,6 +668,35 @@ catto_Bool catto_step(catto_Context* context) {
 
             if (!commandHandler) {
                 context->errorState = CATTO_ERROR_STATE_UNKNOWN_PROCEDURE;
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandlerFunction function = commandHandler->function;
+
+            if (!function) {
+                return CATTO_FALSE;
+            }
+
+            function(context);
+
+            break;
+        }
+
+        case CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT:
+        {
+            catto_Char* extensionName = currentStatement->value.asStatement.attributes.asExtensionCommand.extensionName;
+            catto_Char* commandName = currentStatement->value.asStatement.attributes.asExtensionCommand.commandName;
+            cattox_Extension* extension = cattox_findExtension(context, extensionName, CATTO_TRUE);
+
+            if (!extension) {
+                context->errorState = CATTO_ERROR_STATE_EXTENSION_NOT_LOADED;
+                return CATTO_FALSE;
+            }
+
+            catto_CommandHandler* commandHandler = cattox_findCommandHandlerInExtension(extension, commandName);
+
+            if (!commandHandler) {
+                context->errorState = CATTO_ERROR_STATE_UNKNOWN_EXTENSION_COMMAND;
                 return CATTO_FALSE;
             }
 

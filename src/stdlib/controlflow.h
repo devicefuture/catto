@@ -21,15 +21,10 @@ void catto_command_gosub(catto_Context* context) {
 }
 
 void catto_command_def(catto_Context* context) {
-    catto_AstNode* name = catto_getNextArg(context);
-    catto_Char* subject;
+    catto_Char* subject = catto_getIdentifierName(catto_getNextArg(context));
 
-    if (
-        !name ||
-        name->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
-        !(subject = name->value.asExpressionLeaf.subjectVariable)
-    ) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+    if (!subject) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
         return;
     }
 
@@ -54,15 +49,10 @@ void catto_command_def(catto_Context* context) {
     }
 
     while (catto_hasNextArg(context)) {
-        catto_AstNode* parameterName = catto_getNextArg(context);
-        catto_Char* parameter;
+        catto_Char* parameter = catto_getIdentifierName(catto_getNextArg(context));
 
-        if (
-            !parameterName ||
-            parameterName->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF ||
-            !(parameter = parameterName->value.asExpressionLeaf.subjectVariable)
-        ) {
-            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        if (!parameter) {
+            context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
             return;
         }
 

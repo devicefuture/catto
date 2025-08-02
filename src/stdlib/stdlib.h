@@ -26,6 +26,7 @@ void catto_addContextStandardCommands(catto_Context* context) {
 
     catto_addCommand(context, "scrawl", &catto_command_scrawl);
     catto_addCommand(context, "noscrawl", &catto_command_noscrawl);
+    catto_addCommand(context, "extload", &catto_command_extload);
 
     // Lists
 

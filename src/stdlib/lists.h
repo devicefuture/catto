@@ -1,22 +1,22 @@
 void catto_command_dim(catto_Context* context) {
-    catto_AstNode* identifier = catto_getNextArg(context);
+    catto_Char* identifier = catto_getIdentifierName(catto_getNextArg(context));
 
-    if (identifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+    if (!identifier) {
+        context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
         return;
     }
 
     catto_List* list = catto_newList();
 
     while (catto_hasNextArg(context)) {
-        catto_AstNode* fieldIdentifier = catto_getNextArg(context);
+        catto_Char* fieldIdentifier = catto_getIdentifierName(catto_getNextArg(context));
 
-        if (fieldIdentifier->type != CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
-            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
+        if (!fieldIdentifier) {
+            context->errorState = CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE;
             return;
         }
 
-        catto_addListField(list, fieldIdentifier->value.asExpressionLeaf.subjectVariable);
+        catto_addListField(list, fieldIdentifier);
     }
 
     catto_TypedValue listValue = {
@@ -24,7 +24,7 @@ void catto_command_dim(catto_Context* context) {
         .value = {.asList = list}
     };
 
-    catto_setVariable(context, identifier->value.asExpressionLeaf.subjectVariable, listValue);
+    catto_setVariable(context, identifier, listValue);
 }
 
 void catto_command_push(catto_Context* context) {

@@ -27,6 +27,7 @@ EOF
 include src/config.h
 include src/common.h
 include src/declarations.h
+include src/cattox.h
 include src/operators.h
 include src/contexts.h
 include src/numbers.h
@@ -40,6 +41,7 @@ include src/stdlib/io.h
 include src/stdlib/lists.h
 include src/stdlib/functions.h
 include src/stdlib/stdlib.h
+include src/extensions/test.h
 
 tee -a dist/catto.h > /dev/null << EOF
 #endif

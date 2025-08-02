@@ -5,6 +5,9 @@ typedef enum {
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
     CATTO_ERROR_STATE_LOOP_CONTROL_OUTSIDE_LOOP,
+    CATTO_ERROR_STATE_EXTENSION_NOT_LOADED,
+    CATTO_ERROR_STATE_UNKNOWN_EXTENSION,
+    CATTO_ERROR_STATE_UNKNOWN_EXTENSION_COMMAND,
     CATTO_ERROR_STATE_UNKNOWN_PROCEDURE,
     CATTO_ERROR_STATE_NOT_A_FUNCTION,
     CATTO_ERROR_STATE_NOT_A_LIST,
@@ -36,6 +39,8 @@ typedef enum {
 typedef struct catto_Context {
     struct catto_CommandHandler* firstCommandHandler;
     struct catto_CommandHandler* lastCommandHandler;
+    struct cattox_Extension* firstExtension;
+    struct cattox_Extension* lastExtension;
     struct catto_Variable* firstVariable;
     struct catto_Variable* lastVariable;
     struct catto_Procedure* firstProcedure;
@@ -66,6 +71,14 @@ typedef struct catto_CommandHandler {
     catto_CommandHandlerFunction function;
     struct catto_CommandHandler* nextCommandHandler;
 } catto_CommandHandler;
+
+typedef struct cattox_Extension {
+    const catto_Char* name;
+    catto_Char* alias;
+    catto_CommandHandler* firstCommandHandler;
+    catto_CommandHandler* lastCommandHandler;
+    struct cattox_Extension* nextExtension;
+} cattox_Extension;
 
 typedef enum {
     CATTO_TOKEN_TYPE_SYNTAX_ERROR = '\0',
@@ -137,6 +150,7 @@ typedef enum {
     CATTO_AST_NODE_TYPE_SYNTAX_ERROR = '\0',
     CATTO_AST_NODE_TYPE_NOOP = 'n',
     CATTO_AST_NODE_TYPE_COMMAND_STATEMENT = 'c',
+    CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT = 'x',
     CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT = 'p',
     CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT = '=',
     CATTO_AST_NODE_TYPE_EXPRESSION_LEAF = 'e',
@@ -152,6 +166,10 @@ typedef struct catto_AstNode {
             struct catto_AstNode* firstArgument;
             union {
                 catto_CommandHandler* asCommandHandler;
+                struct {
+                    catto_Char* extensionName;
+                    catto_Char* commandName;
+                } asExtensionCommand;
                 struct {
                     catto_Char* subjectVariable;
                     struct catto_AstNode* index;
@@ -213,6 +231,7 @@ catto_Variable* catto_setVariable(catto_Context* context, const catto_Char* name
 catto_Procedure* catto_getProcedure(catto_Context* context, const catto_Char* name);
 catto_Procedure* catto_createProcedure(catto_Context* context, const catto_Char* name);
 void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_TypedValue value);
+catto_Char* catto_getIdentifierName(catto_AstNode* astNode);
 catto_Bool catto_hasNextArg(catto_Context* context);
 catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode);
 catto_AstNode* catto_getNextArg(catto_Context* context);
@@ -303,3 +322,8 @@ catto_AstNode* catto_findOpeningMark(catto_AstNode* astNode, const catto_Char* m
 catto_AstNode* catto_findClosingMark(catto_AstNode* astNode, const catto_Char* mark, catto_MarkSearchMode searchMode);
 void catto_freeAstNodes(catto_AstNode* firstAstNode);
 void catto_debugAstNodes(catto_AstNode* firstAstNode);
+
+cattox_Extension* cattox_newExtension(catto_Context* context, const catto_Char* name);
+cattox_Extension* cattox_findExtension(catto_Context* context, const catto_Char* name, catto_Bool useAlias);
+catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* extension, const catto_Char* command);
+void cattox_addExtensionCommand(cattox_Extension* extension, const catto_Char* name, catto_CommandHandlerFunction function);
