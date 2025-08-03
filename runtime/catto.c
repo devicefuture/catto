@@ -251,6 +251,7 @@ int main(int argc, char* argv[]) {
     catto_addFunction(context, "epoch", &epochFunction);
 
     cattox_test_init(context);
+    cattox_csv_init(context);
 
     if (argc >= 2) {
         FILE* fp = fopen(argv[1], "r");

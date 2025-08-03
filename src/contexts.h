@@ -388,7 +388,7 @@ void catto_assignValue(catto_Context* context, catto_AstNode* astNode, catto_Typ
             return;
         }
 
-        catto_setListItem(context, list, index, catto_copyTypedValue(value));
+        catto_setListItem(context, list, index, value);
 
         return;
     }

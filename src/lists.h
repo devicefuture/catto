@@ -137,6 +137,8 @@ catto_TypedValue catto_getListItem(catto_List* list, catto_Count index) {
 }
 
 void catto_setListItem(catto_Context* context, catto_List* list, catto_Count index, catto_TypedValue value) {
+    catto_addTypedValueToGc(context, list->values[index]);
+
     if (index >= list->length) {
         while (index > 0 && list->length < index) {
             catto_pushOntoList(list, catto_asTypedNumber(0));
@@ -151,9 +153,7 @@ void catto_setListItem(catto_Context* context, catto_List* list, catto_Count ind
         return;
     }
 
-    catto_addTypedValueToGc(context, list->values[index]);
-
-    list->values[index] = value;
+    list->values[index] = catto_copyTypedValue(value);
 }
 
 catto_Char* catto_listToString(catto_List* list) {

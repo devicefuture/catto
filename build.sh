@@ -42,6 +42,7 @@ include src/stdlib/lists.h
 include src/stdlib/functions.h
 include src/stdlib/stdlib.h
 include src/extensions/test.h
+include src/extensions/csv.h
 
 tee -a dist/catto.h > /dev/null << EOF
 #endif
