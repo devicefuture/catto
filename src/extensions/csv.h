@@ -116,6 +116,8 @@ catto_Bool _cattox_csv_parseNextFieldName(catto_Char* csv, catto_Count* indexPtr
         if (fieldNamePtr) {
             *fieldNamePtr = CATTO_NULL;
         }
+
+        return CATTO_FALSE;
     }
 
     if (fieldNamePtr) {
@@ -186,6 +188,7 @@ catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
         catto_Bool hasNextField = _cattox_csv_parseNextFieldName(csv, &index, &currentFieldName);
 
         if (!currentFieldName) {
+            context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
             return CATTO_NULL;
         }
 
@@ -209,7 +212,7 @@ catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
                 catto_Count charactersEaten = 0;
                 catto_Float number = catto_stringToNumber(currentValue, &charactersEaten);
 
-                if (charactersEaten > 0) {
+                if (charactersEaten == catto_stringLength(currentValue)) {
                     value = catto_asTypedNumber(number);
                 } else {
                     // Value was just an unquoted string; fall back to being string
@@ -252,7 +255,6 @@ void cattox_csv_tolist(catto_Context* context) {
     catto_List* list = _cattox_csv_tolist(context, csvString);
 
     if (!list) {
-        context->errorState = CATTO_ERROR_STATE_UNEXPECTED_TOKEN;
         CATTO_FREE(csvString);
         return;
     }
@@ -267,11 +269,60 @@ void cattox_csv_tolist(catto_Context* context) {
     CATTO_FREE(csvString);
 }
 
+void _cattox_csv_intolist(catto_Context* context, catto_Char* csv, catto_List* list) {
+    catto_List* newList = _cattox_csv_tolist(context, csv);
+
+    if (!newList) {
+        return;
+    }
+
+    if (newList->fieldCount == 0) {
+        catto_freeList(context, newList);
+        return;
+    }
+
+    for (catto_Count newFieldIndex = 0; newFieldIndex < newList->fieldCount; newFieldIndex++) {
+        catto_Bool exists = CATTO_FALSE;
+        catto_Count fieldIndex = catto_getFieldOffset(list, newList->fields[newFieldIndex], &exists);
+
+        if (!exists) {
+            continue;
+        }
+
+        for (catto_Count i = 0; i < newList->length / newList->fieldCount; i++) {
+            catto_Count index = (i * list->fieldCount) + fieldIndex;
+            catto_Count newIndex = (i * newList->fieldCount) + newFieldIndex;
+
+            catto_setListItem(context, list, index, newList->values[newIndex]);
+        }
+    }
+
+    catto_freeList(context, newList);
+}
+
+void cattox_csv_intolist(catto_Context* context) {
+    catto_Char* csvString = catto_asString(catto_evalNextArg(context));
+    catto_AstNode* listArg = catto_getLastArg(context);
+    catto_TypedValue listValue = catto_evalExpression(context, listArg);
+
+    if (listValue.type != CATTO_DATA_TYPE_LIST) {
+        context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
+        return;
+    }
+
+    catto_List* list = listValue.value.asList;
+
+    _cattox_csv_intolist(context, csvString, list);
+
+    CATTO_FREE(csvString);
+}
+
 void cattox_csv_init(catto_Context* context) {
     cattox_Extension* extension = cattox_newExtension(context, "csv");
 
     cattox_addExtensionCommand(extension, "fromlist", cattox_csv_fromlist);
     cattox_addExtensionCommand(extension, "tolist", cattox_csv_tolist);
+    cattox_addExtensionCommand(extension, "intolist", cattox_csv_intolist);
 }
 
 #endif
