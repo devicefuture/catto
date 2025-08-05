@@ -361,13 +361,14 @@ catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNod
     return catto_parseBinaryExpression(0, currentTokenPtr, currentAstNodePtr);
 }
 
-catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr) {
+catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr, catto_Count fileLineNumber) {
     if (!*currentTokenPtr) {
         return CATTO_NULL;
     }
 
     catto_Token* lineNumberToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_LINE_NUMBER);
     catto_Token* commandToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_COMMAND);
+    catto_Count lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : fileLineNumber;
     catto_AstNode* astNode;
     catto_AstNode* lastAstNode = *currentAstNodePtr;
     catto_Bool noop = CATTO_FALSE;
@@ -375,7 +376,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     if (commandToken) {
         astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_COMMAND_STATEMENT, currentAstNodePtr);
 
-        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.lineNumber = lineNumber;
         astNode->value.asStatement.attributes.asCommandHandler = commandToken->value.asCommandHandler;
         astNode->value.asStatement.previousAstNode = lastAstNode;
 
@@ -494,7 +495,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
             astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT, currentAstNodePtr);
 
-            astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+            astNode->value.asStatement.lineNumber = lineNumber;
             astNode->value.asStatement.firstArgument = value;
             astNode->value.asStatement.attributes.asAssignee.subjectVariable = subject;
             astNode->value.asStatement.attributes.asAssignee.index = index;
@@ -537,7 +538,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
             }
         }
 
-        astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+        astNode->value.asStatement.lineNumber = lineNumber;
         astNode->value.asStatement.firstArgument = firstArgument;
         astNode->value.asStatement.previousAstNode = lastAstNode;
 
@@ -550,7 +551,7 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
 
     astNode = catto_addAstNode(noop ? CATTO_AST_NODE_TYPE_NOOP : CATTO_AST_NODE_TYPE_SYNTAX_ERROR, currentAstNodePtr);
 
-    astNode->value.asStatement.lineNumber = lineNumberToken ? lineNumberToken->value.asLineNumber : 0;
+    astNode->value.asStatement.lineNumber = lineNumber;
     astNode->value.asStatement.previousAstNode = lastAstNode;
 
     catto_eat(currentTokenPtr);
@@ -558,17 +559,29 @@ catto_AstNode* catto_parseStatement(catto_Token** currentTokenPtr, catto_AstNode
     return astNode;
 }
 
-catto_AstNode* catto_parse(catto_Token* firstToken) {
+catto_AstNode* catto_parse(catto_Context* context, catto_Token* firstToken) {
     catto_Token** currentTokenPtr = &firstToken;
     catto_AstNode* firstAstNode = CATTO_NULL;
     catto_AstNode* currentAstNode = CATTO_NULL;
+    catto_Count currentFileLineNumber = 0;
 
     while (*currentTokenPtr) {
-        if (catto_parseStatement(currentTokenPtr, &currentAstNode)) {
-            while (
-                catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_STATEMENT_DELIMETER) ||
-                catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_NEXT_LINE)
-            ) {}
+        if (catto_parseStatement(currentTokenPtr, &currentAstNode, context->shouldUseDefinedLineNumbers ? 0 : currentFileLineNumber)) {
+            while (CATTO_TRUE) {
+                catto_Token* currentToken;
+
+                if (catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_STATEMENT_DELIMETER)) {
+                    continue;
+                }
+
+                if ((currentToken = catto_eatIfType(currentTokenPtr, CATTO_TOKEN_TYPE_NEXT_LINE))) {
+                    currentFileLineNumber = currentToken->value.asLineNumber;
+
+                    continue;
+                }
+
+                break;
+            }
         } else {
             catto_AstNode* astNode = catto_addAstNode(CATTO_AST_NODE_TYPE_SYNTAX_ERROR, &currentAstNode);
 

@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     catto_debugTokens(firstToken);
     printf("\n");
 
-    catto_AstNode* firstAstNode = catto_parse(firstToken);
+    catto_AstNode* firstAstNode = catto_parse(context, firstToken);
 
     printf("AST nodes: ");
     catto_debugAstNodes(firstAstNode);

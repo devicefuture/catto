@@ -297,6 +297,7 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;
+    catto_Count fileLineNumber = 1;
     catto_Count length = catto_stringLength(code);
 
     while (index < length) {
@@ -313,6 +314,8 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
         }
 
         if (catto_matchChar('\n', CATTO_TOKEN_TYPE_NEXT_LINE, code, &index, &currentToken)) {
+            currentToken->value.asLineNumber = ++fileLineNumber;
+
             continue;
         }
 

@@ -57,6 +57,7 @@ typedef struct catto_Context {
     catto_Count pointersToGcCount;
     catto_ErrorState errorState;
     catto_Count subjectLineNumber;
+    catto_Bool shouldUseDefinedLineNumbers;
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
     catto_Count randomSeed;
@@ -311,7 +312,7 @@ void catto_debugTokens(catto_Token* firstToken);
 
 catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
-catto_AstNode* catto_parse(catto_Token* firstToken);
+catto_AstNode* catto_parse(catto_Context* context, catto_Token* firstToken);
 catto_Bool catto_isCommand(catto_AstNode* astNode, const catto_Char* command);
 catto_TypedValue* catto_getMarkConditionSwitch(catto_AstNode* astNode);
 catto_Bool catto_markConditionSwitchIsEnabled(catto_AstNode* astNode);

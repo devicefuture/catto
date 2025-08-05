@@ -24,6 +24,7 @@ catto_Context* catto_newContext() {
 
     context->errorState = CATTO_ERROR_STATE_NONE;
     context->subjectLineNumber = 0;
+    context->shouldUseDefinedLineNumbers = CATTO_FALSE;
     context->scrawlMode = CATTO_FALSE;
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
     context->randomSeed = 0xFFFFFFFF;
@@ -869,13 +870,27 @@ catto_AstNode* catto_popFromStatementStack(catto_Context* context) {
 
 void catto_load(catto_Context* context, const catto_Char* code) {
     context->errorState = CATTO_ERROR_STATE_NONE;
-    context->subjectLineNumber = 0;
+    context->subjectLineNumber = context->shouldUseDefinedLineNumbers ? 0 : 1;
 
     catto_Token* firstToken = catto_tokenise(context, code);
     catto_Token* currentToken = firstToken;
 
+    context->shouldUseDefinedLineNumbers = CATTO_FALSE;
+
     while (currentToken) {
         if (currentToken->type == CATTO_TOKEN_TYPE_LINE_NUMBER) {
+            context->shouldUseDefinedLineNumbers = CATTO_TRUE;
+
+            break;
+        }
+
+        currentToken = currentToken->nextToken;
+    }
+
+    currentToken = firstToken;
+
+    while (currentToken) {
+        if (currentToken->type == CATTO_TOKEN_TYPE_LINE_NUMBER || currentToken->type == CATTO_TOKEN_TYPE_NEXT_LINE) {
             context->subjectLineNumber = currentToken->value.asLineNumber;
         }
 
@@ -890,7 +905,7 @@ void catto_load(catto_Context* context, const catto_Char* code) {
         currentToken = currentToken->nextToken;
     }
 
-    catto_AstNode* firstAstNode = catto_parse(firstToken);
+    catto_AstNode* firstAstNode = catto_parse(context, firstToken);
     catto_AstNode* currentAstNode = firstAstNode;
 
     if (context->firstParsedStatement) {
@@ -900,12 +915,14 @@ void catto_load(catto_Context* context, const catto_Char* code) {
         context->nextParsedStatement = CATTO_NULL;
     }
 
-    context->subjectLineNumber = 0;
+    context->subjectLineNumber = context->shouldUseDefinedLineNumbers ? 0 : 1;
 
     while (currentAstNode) {
         if (
             currentAstNode->type == CATTO_AST_NODE_TYPE_SYNTAX_ERROR ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_COMMAND_STATEMENT ||
+            currentAstNode->type == CATTO_AST_NODE_TYPE_EXTENSION_COMMAND_STATEMENT ||
+            currentAstNode->type == CATTO_AST_NODE_TYPE_PROCEDURE_STATEMENT ||
             currentAstNode->type == CATTO_AST_NODE_TYPE_ASSIGNMENT_STATEMENT
         ) {
             catto_Count lineNumber = currentAstNode->value.asStatement.lineNumber;
@@ -926,7 +943,7 @@ void catto_load(catto_Context* context, const catto_Char* code) {
         currentAstNode = currentAstNode->nextAstNode;
     }
 
-    context->subjectLineNumber = 0;
+    context->subjectLineNumber = context->shouldUseDefinedLineNumbers ? 0 : 1;
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
     context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, 0);
