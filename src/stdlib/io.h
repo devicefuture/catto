@@ -38,6 +38,12 @@ void catto_command_extload(catto_Context* context) {
 
     cattox_Extension* extension = cattox_findExtension(context, name, CATTO_FALSE);
 
+    if (!extension) {
+        context->errorState = CATTO_ERROR_STATE_UNKNOWN_EXTENSION;
+        CATTO_FREE(name);
+        return;
+    }
+
     if (extension->alias) {
         CATTO_FREE(extension->alias);
     }

@@ -34,6 +34,8 @@ cattox_Extension* cattox_findExtension(catto_Context* context, const catto_Char*
 
         extension = extension->nextExtension;
     }
+
+    return CATTO_NULL;
 }
 
 catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* extension, const catto_Char* command) {

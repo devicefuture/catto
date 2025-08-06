@@ -475,6 +475,8 @@ CATTO_FN_PREFIX cattox_Extension* cattox_findExtension(catto_Context* context, c
 
         extension = extension->nextExtension;
     }
+
+    return CATTO_NULL;
 }
 
 CATTO_FN_PREFIX catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* extension, const catto_Char* command) {
@@ -4451,6 +4453,12 @@ CATTO_FN_PREFIX void catto_command_extload(catto_Context* context) {
     catto_Char* name = nameIdentifier ? catto_copyString(nameIdentifier) : catto_asString(catto_evalNextArg(context));
 
     cattox_Extension* extension = cattox_findExtension(context, name, CATTO_FALSE);
+
+    if (!extension) {
+        context->errorState = CATTO_ERROR_STATE_UNKNOWN_EXTENSION;
+        CATTO_FREE(name);
+        return;
+    }
 
     if (extension->alias) {
         CATTO_FREE(extension->alias);
