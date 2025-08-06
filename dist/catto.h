@@ -487,6 +487,8 @@ CATTO_FN_PREFIX catto_CommandHandler* cattox_findCommandHandlerInExtension(catto
 
         commandHandler = commandHandler->nextCommandHandler;
     }
+
+    return CATTO_NULL;
 }
 
 CATTO_FN_PREFIX void cattox_addExtensionCommand(cattox_Extension* extension, const catto_Char* name, catto_CommandHandlerFunction function) {

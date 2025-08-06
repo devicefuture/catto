@@ -46,6 +46,8 @@ catto_CommandHandler* cattox_findCommandHandlerInExtension(cattox_Extension* ext
 
         commandHandler = commandHandler->nextCommandHandler;
     }
+
+    return CATTO_NULL;
 }
 
 void cattox_addExtensionCommand(cattox_Extension* extension, const catto_Char* name, catto_CommandHandlerFunction function) {
