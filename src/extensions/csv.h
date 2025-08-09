@@ -88,24 +88,27 @@ catto_Bool _cattox_csv_parseNextFieldName(catto_Char* csv, catto_Count* indexPtr
     while (csv[*indexPtr] != '\0') {
         catto_Char currentChar = csv[*indexPtr];
 
-        if (currentChar == '$' || currentChar == '%') {
-            (*indexPtr)++;
-
-            break;
-        } else if (
+        if (
             (currentChar >= 'a' && currentChar <= 'z') ||
             (currentChar >= 'A' && currentChar <= 'Z') ||
             (hadFirstCharacter && currentChar >= '0' && currentChar <= '9') ||
-            currentChar == '_'
+            currentChar == '_' ||
+            (hadFirstCharacter && (currentChar == '$' || currentChar == '%'))
         ) {
             fieldName = catto_appendCharToString(fieldName, currentChar);
             hadFirstCharacter = CATTO_TRUE;
 
             (*indexPtr)++;
+
+            if (currentChar == '$' || currentChar == '%') {
+                break;
+            }
         } else {
             break;
         }
     }
+
+    printf("FN: %s\n", fieldName);
 
     if (
         catto_stringLength(fieldName) == 0 ||
