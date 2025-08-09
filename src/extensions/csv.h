@@ -108,8 +108,6 @@ catto_Bool _cattox_csv_parseNextFieldName(catto_Char* csv, catto_Count* indexPtr
         }
     }
 
-    printf("FN: %s\n", fieldName);
-
     if (
         catto_stringLength(fieldName) == 0 ||
         (csv[*indexPtr] != ',' && csv[*indexPtr] != '\n' && csv[*indexPtr] != '\0')
