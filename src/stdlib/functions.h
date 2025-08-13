@@ -157,7 +157,12 @@ catto_TypedValue catto_function_len(catto_Context* context, catto_DataType retur
         return catto_asTypedNumber(list->length / fieldCount);
     }
 
-    return catto_asTypedNumber(catto_stringLength(catto_asString(value)));
+    catto_Char* valueString = catto_asString(value);
+    catto_TypedValue length = catto_asTypedNumber(catto_stringLength(valueString));
+
+    CATTO_FREE(valueString);
+
+    return length;
 }
 
 catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {

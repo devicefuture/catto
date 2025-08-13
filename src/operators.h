@@ -51,7 +51,6 @@ const catto_Char* catto_unaryOperators[] = {
 CATTO_UNARY_NUMERIC_OPERATOR(catto_unary_add, +);
 CATTO_UNARY_NUMERIC_OPERATOR(catto_unary_subtract, -);
 CATTO_UNARY_INTEGER_OPERATOR(catto_unary_bitwiseNot, ~);
-CATTO_UNARY_INTEGER_OPERATOR(catto_unary_not, !);
 
 CATTO_BINARY_NUMERIC_OPERATOR(catto_binary_add, +);
 CATTO_BINARY_NUMERIC_OPERATOR(catto_binary_subtract, -);
@@ -70,6 +69,24 @@ CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_lessThan, <);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_greaterThan, >);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_and, &&);
 CATTO_BINARY_LOGICAL_OPERATOR(catto_binary_or, ||);
+
+catto_TypedValue catto_unary_not(catto_Context* context, catto_TypedValue value) {
+    if (value.type == CATTO_DATA_TYPE_LIST) {
+        return catto_asTypedNumber(0);
+    }
+
+    if (value.type == CATTO_DATA_TYPE_NUMBER) {
+        return catto_asTypedNumber(!catto_asNumber(value) ? 1 : 0);
+    }
+
+    catto_Char* valueString = catto_asString(value);
+
+    catto_Bool result = !catto_stringLength(valueString);
+
+    CATTO_FREE(valueString);
+
+    return catto_asTypedNumber(result ? 1 : 0);
+}
 
 catto_TypedValue catto_binary_power(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     return catto_asTypedNumber(catto_power(catto_asNumber(a), catto_asNumber(b)));
