@@ -4172,7 +4172,7 @@ CATTO_FN_PREFIX void catto_appendCharToTokenFile(catto_Context* context, catto_C
     context->tokenFile[context->tokenFileSize - 1] = c;
 }
 
-CATTO_FN_PREFIX void catto_appendStringToTokenFile(catto_Context* context, catto_Char* string, catto_Bool nullTerminated) {
+CATTO_FN_PREFIX void catto_appendStringToTokenFile(catto_Context* context, const catto_Char* string, catto_Bool nullTerminated) {
     while (*string) {
         catto_appendCharToTokenFile(context, *string);
 

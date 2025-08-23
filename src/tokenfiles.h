@@ -9,7 +9,7 @@ void catto_appendCharToTokenFile(catto_Context* context, catto_Char c) {
     context->tokenFile[context->tokenFileSize - 1] = c;
 }
 
-void catto_appendStringToTokenFile(catto_Context* context, catto_Char* string, catto_Bool nullTerminated) {
+void catto_appendStringToTokenFile(catto_Context* context, const catto_Char* string, catto_Bool nullTerminated) {
     while (*string) {
         catto_appendCharToTokenFile(context, *string);
 
