@@ -94,10 +94,13 @@ bool readLine(char** line) {
     }
 }
 
-void runCode(catto_Context* context, char* code) {
-    interrupted = false;
-
+void loadCode(catto_Context* context, char* code) {
     catto_load(context, code);
+    free(code);
+}
+
+void runCode(catto_Context* context) {
+    interrupted = false;
 
     while (catto_step(context)) {
         if (getchar() == '\e') { // Escape
@@ -113,6 +116,7 @@ void runCode(catto_Context* context, char* code) {
 
     switch (context->errorState) {
         case CATTO_ERROR_STATE_UNEXPECTED_TOKEN: message = "Unexpected token"; break;
+        case CATTO_ERROR_STATE_INVALID_AT_FORMAT: message = "Invalid token file format"; break;
         case CATTO_ERROR_STATE_NO_RETURN: message = "Nothing to return to"; break;
         case CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK: message = "Mismatched statement opening mark"; break;
         case CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK: message = "Mismatched statement closing mark"; break;
@@ -137,8 +141,6 @@ void runCode(catto_Context* context, char* code) {
             fprintf(stderr, "%s\n", message);
         }
     }
-
-    free(code);
 
     if (interrupted) {
         printf("Interrupt\n");
@@ -253,6 +255,8 @@ int main(int argc, char* argv[]) {
     cattox_test_init(context);
     cattox_csv_init(context);
 
+    bool generatingTokenFile = false;
+
     if (argc >= 2) {
         FILE* fp = fopen(argv[1], "r");
 
@@ -279,7 +283,46 @@ int main(int argc, char* argv[]) {
 
         code[size] = '\0';
 
-        runCode(context, code);
+        if (argc >= 3 && catto_stringsEqual(argv[2], "--gen-at")) {
+            if (argc <= 3) {
+                fprintf(stderr, "Missing filename to generate token file\n");
+
+                tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
+
+                return 1;
+            }
+
+            generatingTokenFile = true;
+
+            context->generatingTokenFile = CATTO_TRUE;
+
+            catto_Token* firstToken = catto_tokenise(context, code);
+
+            catto_freeTokens(firstToken);
+
+            catto_generateTokenFile(context);
+
+            fp = fopen(argv[3], "w");
+
+            if (!fp) {
+                fprintf(stderr, "Error when writing token file\n");
+
+                tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
+
+                return 1;
+            }
+
+            fwrite(context->tokenFile, 1, context->tokenFileSize, fp);
+            fclose(fp);
+
+            tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
+
+            return 0;
+        }
+
+        catto_loadWithSize(context, code, size);
+        free(code);
+        runCode(context);
 
         tcsetattr(STDIN_FILENO, TCSANOW, &originalAttributes);
 
@@ -311,7 +354,8 @@ int main(int argc, char* argv[]) {
         }
 
         if (catto_stringsEqualCaseInsensitive(lineString, "run")) {
-            runCode(context, assembleLines());
+            loadCode(context, assembleLines());
+            runCode(context);
 
             continue;
         }
@@ -430,6 +474,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        runCode(context, catto_copyString(lineString));
+        loadCode(context, catto_copyString(lineString));
+        runCode(context);
     }
 }

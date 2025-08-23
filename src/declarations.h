@@ -1,6 +1,7 @@
 typedef enum {
     CATTO_ERROR_STATE_NONE = 0,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
+    CATTO_ERROR_STATE_INVALID_AT_FORMAT,
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
@@ -61,6 +62,13 @@ typedef struct catto_Context {
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
     catto_Count randomSeed;
+    catto_Bool generatingTokenFile;
+    catto_Char** tokenDefinitions;
+    catto_Count tokenDefinitionsCount;
+    catto_Count* tokenIndexes;
+    catto_Count tokenIndexesCount;
+    catto_Char* tokenFile;
+    catto_Count tokenFileSize;
     void* userData;
 } catto_Context;
 
@@ -217,6 +225,9 @@ typedef enum {
     CATTO_SLICING_METHOD_MID
 } catto_SlicingMethod;
 
+void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset);
+catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length);
+
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
 void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
@@ -309,6 +320,10 @@ void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value
 catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
+
+void catto_generateTokenFile(catto_Context* context);
+catto_Bool catto_isTokenFile(catto_Context* context);
+catto_Char* catto_parseTokenFile(catto_Context* context);
 
 catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);

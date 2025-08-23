@@ -16,3 +16,19 @@ typedef CATTO_FLOAT catto_Float;
 #define CATTO_PHI 1.618033988798948
 
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
+
+void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset) {
+    for (catto_Count i = 0; i < length; i++) {
+        destination[i + offset] = source[i];
+    }
+}
+
+catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length) {
+    for (catto_Count i = 0; i < length; i++) {
+        if (a[i] != b[i]) {
+            return CATTO_FALSE;
+        }
+    }
+
+    return CATTO_TRUE;
+}

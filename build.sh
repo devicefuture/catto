@@ -36,6 +36,7 @@ include src/lists.h
 include src/datatypes.h
 include src/tokeniser.h
 include src/parser.h
+include src/tokenfiles.h
 include src/stdlib/controlflow.h
 include src/stdlib/io.h
 include src/stdlib/lists.h

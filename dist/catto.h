@@ -104,11 +104,28 @@ typedef CATTO_FLOAT catto_Float;
 
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
 
+CATTO_FN_PREFIX void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset) {
+    for (catto_Count i = 0; i < length; i++) {
+        destination[i + offset] = source[i];
+    }
+}
+
+CATTO_FN_PREFIX catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length) {
+    for (catto_Count i = 0; i < length; i++) {
+        if (a[i] != b[i]) {
+            return CATTO_FALSE;
+        }
+    }
+
+    return CATTO_TRUE;
+}
+
 // src/declarations.h
 
 typedef enum {
     CATTO_ERROR_STATE_NONE = 0,
     CATTO_ERROR_STATE_UNEXPECTED_TOKEN,
+    CATTO_ERROR_STATE_INVALID_AT_FORMAT,
     CATTO_ERROR_STATE_NO_RETURN,
     CATTO_ERROR_STATE_MISMATCHED_OPENING_MARK,
     CATTO_ERROR_STATE_MISMATCHED_CLOSING_MARK,
@@ -169,6 +186,13 @@ typedef struct catto_Context {
     catto_Bool scrawlMode;
     catto_TrigMode trigMode;
     catto_Count randomSeed;
+    catto_Bool generatingTokenFile;
+    catto_Char** tokenDefinitions;
+    catto_Count tokenDefinitionsCount;
+    catto_Count* tokenIndexes;
+    catto_Count tokenIndexesCount;
+    catto_Char* tokenFile;
+    catto_Count tokenFileSize;
     void* userData;
 } catto_Context;
 
@@ -325,6 +349,9 @@ typedef enum {
     CATTO_SLICING_METHOD_MID
 } catto_SlicingMethod;
 
+void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset);
+catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length);
+
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
 void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
@@ -417,6 +444,10 @@ void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value
 catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);
 void catto_freeTokens(catto_Token* firstToken);
 void catto_debugTokens(catto_Token* firstToken);
+
+void catto_generateTokenFile(catto_Context* context);
+catto_Bool catto_isTokenFile(catto_Context* context);
+catto_Char* catto_parseTokenFile(catto_Context* context);
 
 catto_AstNode* catto_createExpressionLeaf(catto_TypedValue value, catto_AstNode** currentAstNodePtr);
 catto_AstNode* catto_parseExpression(catto_Token** currentTokenPtr, catto_AstNode** currentAstNodePtr);
@@ -723,6 +754,14 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
     context->randomSeed = 0xFFFFFFFF;
 
+    context->generatingTokenFile = CATTO_FALSE;
+    context->tokenDefinitions = (catto_Char**)CATTO_MALLOC(0);
+    context->tokenDefinitionsCount = 0;
+    context->tokenIndexes = (catto_Count*)CATTO_MALLOC(0);
+    context->tokenIndexesCount = 0;
+    context->tokenFile = (catto_Char*)CATTO_MALLOC(0);
+    context->tokenFileSize = 0;
+
     return context;
 }
 
@@ -786,9 +825,16 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
 
     catto_gc(context);
 
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        CATTO_FREE(context->tokenDefinitions[i]);
+    }
+
     CATTO_FREE(context->statementStack);
     CATTO_FREE(context->pointersToGc);
     CATTO_FREE(context->pointerTypesToGc);
+    CATTO_FREE(context->tokenDefinitions);
+    CATTO_FREE(context->tokenIndexes);
+    CATTO_FREE(context->tokenFile);
     CATTO_FREE(context);
 }
 
@@ -1645,6 +1691,37 @@ CATTO_FN_PREFIX void catto_load(catto_Context* context, const catto_Char* code) 
 
     catto_removeScopedVariables(context);
     catto_freeTokens(firstToken);
+}
+
+CATTO_FN_PREFIX void catto_loadWithSize(catto_Context* context, const catto_Char* code, catto_Count size) {
+    catto_Bool shouldFreeCode = CATTO_FALSE;
+
+    context->errorState = CATTO_ERROR_STATE_NONE;
+
+    context->tokenFile = CATTO_REALLOC(context->tokenFile, size);
+    context->tokenFileSize = size;
+
+    catto_copyMemory(code, context->tokenFile, size, 0);
+
+    if (catto_isTokenFile(context)) {
+        catto_Char* parsedCode = catto_parseTokenFile(context);
+
+        if (!parsedCode) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_AT_FORMAT;
+            goto end;
+        }
+
+        catto_load(context, parsedCode);
+
+        CATTO_FREE(parsedCode);
+    } else {
+        catto_load(context, code);
+    }
+
+    end:
+
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 0);
+    context->tokenFileSize = 0;
 }
 
 CATTO_FN_PREFIX void catto_run(catto_Context* context) {
@@ -3003,14 +3080,58 @@ CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(catto_Context* context, const
     return token;
 }
 
+CATTO_FN_PREFIX void catto_emitToken(catto_Context* context, const catto_Char* code, catto_Count length) {
+    catto_Char* value = catto_copyString("");
+
+    for (catto_Count i = 0; i < length; i++) {
+        value = catto_appendCharToString(value, code[i]);
+    }
+
+    catto_Bool foundExistingDefinition = CATTO_FALSE;
+    catto_Count index = 0;
+
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        if (catto_stringsEqual(context->tokenDefinitions[i], value)) {
+            foundExistingDefinition = CATTO_TRUE;
+            index = i;
+
+            CATTO_FREE(value);
+
+            break;
+        }
+    }
+
+    if (!foundExistingDefinition) {
+        context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
+        index = context->tokenDefinitionsCount;
+        context->tokenDefinitions[context->tokenDefinitionsCount++] = value;
+    }
+
+    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
+    context->tokenIndexes[context->tokenIndexesCount++] = index;
+}
+
 CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;
+    catto_Count lastIndex = 0;
     catto_Count fileLineNumber = 1;
     catto_Count length = catto_stringLength(code);
+    catto_Bool skipEmit = CATTO_FALSE;
 
-    while (index < length) {
+    while (CATTO_TRUE) {
+        if (context->generatingTokenFile && !skipEmit && lastIndex != index) {
+            catto_emitToken(context, code + lastIndex, index - lastIndex);
+        }
+
+        lastIndex = index;
+        skipEmit = CATTO_FALSE;
+
+        if (index >= length) {
+            break;
+        }
+
         catto_Char currentChar = code[index];
 
         if (currentToken && !firstToken) {
@@ -3019,6 +3140,7 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
 
         if (code[index] == ' ') {
             index++;
+            skipEmit = CATTO_TRUE;
  
             continue;
         }
@@ -3034,6 +3156,8 @@ CATTO_FN_PREFIX catto_Token* catto_tokenise(catto_Context* context, const catto_
         }
 
         if (catto_matchComment(code, &index, &currentToken)) {
+            skipEmit = CATTO_TRUE;
+
             continue;
         }
 
@@ -4033,6 +4157,202 @@ CATTO_FN_PREFIX void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
         currentAstNode = currentAstNode->nextAstNode;
     }
+}
+
+// src/tokenfiles.h
+
+CATTO_FN_PREFIX void catto_growTokenFile(catto_Context* context, catto_Count amount) {
+    context->tokenFileSize += amount;
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, context->tokenFileSize);
+}
+
+CATTO_FN_PREFIX void catto_appendCharToTokenFile(catto_Context* context, catto_Char c) {
+    catto_growTokenFile(context, 1);
+
+    context->tokenFile[context->tokenFileSize - 1] = c;
+}
+
+CATTO_FN_PREFIX void catto_appendStringToTokenFile(catto_Context* context, catto_Char* string, catto_Bool nullTerminated) {
+    while (*string) {
+        catto_appendCharToTokenFile(context, *string);
+
+        string++;
+    }
+
+    if (nullTerminated) {
+        catto_appendCharToTokenFile(context, '\0');
+    }
+}
+
+// Counts are encoded as LEB128
+// @source reference https://en.wikipedia.org/wiki/LEB128
+// @licence ccbysa4
+CATTO_FN_PREFIX void catto_appendCountToTokenFile(catto_Context* context, catto_Count value) {
+    do {
+        catto_Char byte = value & 0x7F;
+
+        value >>= 7;
+
+        if (value != 0) {
+            byte |= 0x80;
+        }
+
+        catto_appendCharToTokenFile(context, byte);
+    } while (value != 0);
+}
+
+CATTO_FN_PREFIX void catto_generateTokenFile(catto_Context* context) {
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 4);
+    context->tokenFileSize = 4;
+
+    context->tokenFile[0] = '\0';
+    context->tokenFile[1] = 'A';
+    context->tokenFile[2] = 'T';
+    context->tokenFile[3] = 0; // Format version number
+
+    catto_appendStringToTokenFile(context, "DEFN", CATTO_FALSE);
+
+    catto_appendCountToTokenFile(context, context->tokenDefinitionsCount);
+
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        catto_appendStringToTokenFile(context, context->tokenDefinitions[i], CATTO_TRUE);
+    }
+
+    catto_appendStringToTokenFile(context, "INDX", CATTO_FALSE);
+
+    catto_appendCountToTokenFile(context, context->tokenIndexesCount);
+
+    for (catto_Count i = 0; i < context->tokenIndexesCount; i++) {
+        catto_appendCountToTokenFile(context, context->tokenIndexes[i]);
+    }
+
+    catto_appendCharToTokenFile(context, '\0');
+}
+CATTO_FN_PREFIX catto_Bool catto_isTokenFile(catto_Context* context) {
+    return context->tokenFileSize >= 4 && catto_memoryEquals(context->tokenFile, "\0AT\0", 4);
+}
+
+// Counts are encoded as LEB128
+// @source reference https://en.wikipedia.org/wiki/LEB128
+// @licence ccbysa4
+CATTO_FN_PREFIX catto_Count catto_readCountFromTokenFile(catto_Context* context, catto_Count* index) {
+    catto_Count result = 0;
+    catto_Count shift = 0;
+    catto_Count byte;
+
+    do {
+        if (*index > context->tokenFileSize) {
+            return -1;
+        }
+
+        byte = context->tokenFile[(*index)++];
+
+        result |= (byte & 0b01111111) << shift;
+        shift += 7;
+    } while ((byte & 0b10000000) != 0);
+
+    return result;
+}
+
+CATTO_FN_PREFIX catto_Char* catto_readStringFromTokenFile(catto_Context* context, catto_Count* index) {
+    catto_Char* string = catto_copyString("");
+
+    while (CATTO_TRUE) {
+        if (*index > context->tokenFileSize) {
+            CATTO_FREE(string);
+
+            return CATTO_NULL;
+        }
+
+        if (context->tokenFile[*index] == '\0') {
+            (*index)++;
+            break;
+        }
+
+        string = catto_appendCharToString(string, context->tokenFile[(*index)++]);
+    }
+
+    return string;
+}
+
+CATTO_FN_PREFIX catto_Char* catto_parseTokenFile(catto_Context* context) {
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        CATTO_FREE(context->tokenDefinitions[i]);
+    }
+
+    context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, 0);
+    context->tokenDefinitionsCount = 0;
+    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, 0);
+    context->tokenIndexesCount = 0;
+
+    if (!catto_isTokenFile(context)) {
+        return CATTO_NULL;
+    }
+
+    catto_Count index = 4;
+    catto_Char* code = catto_copyString("");
+
+    while (index < context->tokenFileSize) {
+        if (context->tokenFile[index] == '\0') {
+            break;
+        }
+
+        if (index + 4 >= context->tokenFileSize) {
+            return CATTO_NULL;
+        }
+
+        if (catto_memoryEquals(context->tokenFile + index, "DEFN", 4)) {
+            index += 4;
+
+            catto_Count definitionsCount = catto_readCountFromTokenFile(context, &index);
+
+            if (definitionsCount == -1) {
+                CATTO_FREE(code);
+                return CATTO_NULL;
+            }
+
+            context->tokenDefinitionsCount = definitionsCount;
+            context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * definitionsCount);
+
+            for (catto_Count i = 0; i < definitionsCount; i++) {
+                catto_Char* value = catto_readStringFromTokenFile(context, &index);
+
+                if (!value) {
+                    CATTO_FREE(code);
+                    return CATTO_NULL;
+                }
+
+                context->tokenDefinitions[i] = value;
+            }
+
+            continue;
+        }
+
+        if (catto_memoryEquals(context->tokenFile + index, "INDX", 4)) {
+            index += 4;
+
+            catto_Count indexesCount = catto_readCountFromTokenFile(context, &index);
+
+            if (indexesCount == -1) {
+                CATTO_FREE(code);
+                return CATTO_NULL;
+            }
+
+            for (catto_Count i = 0; i < indexesCount; i++) {
+                catto_Count tokenIndex = catto_readCountFromTokenFile(context, &index);
+
+                if (tokenIndex == -1 || tokenIndex >= context->tokenDefinitionsCount) {
+                    CATTO_FREE(code);
+                    return CATTO_NULL;
+                }
+
+                code = catto_appendToString(code, context->tokenDefinitions[tokenIndex]);
+                code = catto_appendCharToString(code, ' ');
+            }
+        }
+    }
+
+    return code;
 }
 
 // src/stdlib/controlflow.h

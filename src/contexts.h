@@ -29,6 +29,14 @@ catto_Context* catto_newContext() {
     context->trigMode = CATTO_TRIG_MODE_DEGREES;
     context->randomSeed = 0xFFFFFFFF;
 
+    context->generatingTokenFile = CATTO_FALSE;
+    context->tokenDefinitions = (catto_Char**)CATTO_MALLOC(0);
+    context->tokenDefinitionsCount = 0;
+    context->tokenIndexes = (catto_Count*)CATTO_MALLOC(0);
+    context->tokenIndexesCount = 0;
+    context->tokenFile = (catto_Char*)CATTO_MALLOC(0);
+    context->tokenFileSize = 0;
+
     return context;
 }
 
@@ -92,9 +100,16 @@ void catto_freeContext(catto_Context* context) {
 
     catto_gc(context);
 
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        CATTO_FREE(context->tokenDefinitions[i]);
+    }
+
     CATTO_FREE(context->statementStack);
     CATTO_FREE(context->pointersToGc);
     CATTO_FREE(context->pointerTypesToGc);
+    CATTO_FREE(context->tokenDefinitions);
+    CATTO_FREE(context->tokenIndexes);
+    CATTO_FREE(context->tokenFile);
     CATTO_FREE(context);
 }
 
@@ -951,6 +966,37 @@ void catto_load(catto_Context* context, const catto_Char* code) {
 
     catto_removeScopedVariables(context);
     catto_freeTokens(firstToken);
+}
+
+void catto_loadWithSize(catto_Context* context, const catto_Char* code, catto_Count size) {
+    catto_Bool shouldFreeCode = CATTO_FALSE;
+
+    context->errorState = CATTO_ERROR_STATE_NONE;
+
+    context->tokenFile = CATTO_REALLOC(context->tokenFile, size);
+    context->tokenFileSize = size;
+
+    catto_copyMemory(code, context->tokenFile, size, 0);
+
+    if (catto_isTokenFile(context)) {
+        catto_Char* parsedCode = catto_parseTokenFile(context);
+
+        if (!parsedCode) {
+            context->errorState = CATTO_ERROR_STATE_INVALID_AT_FORMAT;
+            goto end;
+        }
+
+        catto_load(context, parsedCode);
+
+        CATTO_FREE(parsedCode);
+    } else {
+        catto_load(context, code);
+    }
+
+    end:
+
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 0);
+    context->tokenFileSize = 0;
 }
 
 void catto_run(catto_Context* context) {

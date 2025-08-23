@@ -293,14 +293,58 @@ catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* cod
     return token;
 }
 
+void catto_emitToken(catto_Context* context, const catto_Char* code, catto_Count length) {
+    catto_Char* value = catto_copyString("");
+
+    for (catto_Count i = 0; i < length; i++) {
+        value = catto_appendCharToString(value, code[i]);
+    }
+
+    catto_Bool foundExistingDefinition = CATTO_FALSE;
+    catto_Count index = 0;
+
+    for (catto_Count i = 0; i < context->tokenDefinitionsCount; i++) {
+        if (catto_stringsEqual(context->tokenDefinitions[i], value)) {
+            foundExistingDefinition = CATTO_TRUE;
+            index = i;
+
+            CATTO_FREE(value);
+
+            break;
+        }
+    }
+
+    if (!foundExistingDefinition) {
+        context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
+        index = context->tokenDefinitionsCount;
+        context->tokenDefinitions[context->tokenDefinitionsCount++] = value;
+    }
+
+    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
+    context->tokenIndexes[context->tokenIndexesCount++] = index;
+}
+
 catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
     catto_Token* firstToken = CATTO_NULL;
     catto_Token* currentToken = CATTO_NULL;
     catto_Count index = 0;
+    catto_Count lastIndex = 0;
     catto_Count fileLineNumber = 1;
     catto_Count length = catto_stringLength(code);
+    catto_Bool skipEmit = CATTO_FALSE;
 
-    while (index < length) {
+    while (CATTO_TRUE) {
+        if (context->generatingTokenFile && !skipEmit && lastIndex != index) {
+            catto_emitToken(context, code + lastIndex, index - lastIndex);
+        }
+
+        lastIndex = index;
+        skipEmit = CATTO_FALSE;
+
+        if (index >= length) {
+            break;
+        }
+
         catto_Char currentChar = code[index];
 
         if (currentToken && !firstToken) {
@@ -309,6 +353,7 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
 
         if (code[index] == ' ') {
             index++;
+            skipEmit = CATTO_TRUE;
  
             continue;
         }
@@ -324,6 +369,8 @@ catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code) {
         }
 
         if (catto_matchComment(code, &index, &currentToken)) {
+            skipEmit = CATTO_TRUE;
+
             continue;
         }
 
