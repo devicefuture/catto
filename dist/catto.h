@@ -110,7 +110,7 @@ CATTO_FN_PREFIX void catto_copyMemory(const catto_Char* source, catto_Char* dest
     }
 }
 
-CATTO_FN_PREFIX catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length) {
+CATTO_FN_PREFIX catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Count length) {
     for (catto_Count i = 0; i < length; i++) {
         if (a[i] != b[i]) {
             return CATTO_FALSE;
@@ -350,7 +350,7 @@ typedef enum {
 } catto_SlicingMethod;
 
 void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset);
-catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length);
+catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Count length);
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
@@ -1698,7 +1698,7 @@ CATTO_FN_PREFIX void catto_loadWithSize(catto_Context* context, const catto_Char
 
     context->errorState = CATTO_ERROR_STATE_NONE;
 
-    context->tokenFile = CATTO_REALLOC(context->tokenFile, size);
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, size);
     context->tokenFileSize = size;
 
     catto_copyMemory(code, context->tokenFile, size, 0);
