@@ -973,7 +973,7 @@ void catto_loadWithSize(catto_Context* context, const catto_Char* code, catto_Co
 
     context->errorState = CATTO_ERROR_STATE_NONE;
 
-    context->tokenFile = CATTO_REALLOC(context->tokenFile, size);
+    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, size);
     context->tokenFileSize = size;
 
     catto_copyMemory(code, context->tokenFile, size, 0);

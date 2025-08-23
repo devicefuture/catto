@@ -226,7 +226,7 @@ typedef enum {
 } catto_SlicingMethod;
 
 void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset);
-catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length);
+catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Count length);
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);

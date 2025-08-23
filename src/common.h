@@ -23,7 +23,7 @@ void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_C
     }
 }
 
-catto_Bool catto_memoryEquals(catto_Char* a, catto_Char* b, catto_Count length) {
+catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Count length) {
     for (catto_Count i = 0; i < length; i++) {
         if (a[i] != b[i]) {
             return CATTO_FALSE;
