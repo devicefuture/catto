@@ -21,14 +21,16 @@ catto_List* catto_referenceList(catto_List* list) {
     return list;
 }
 
-void catto_dereferenceList(catto_Context* context, catto_List* list) {
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_dereferenceList(catto_Context* context, catto_List* list) {
     if (list->referenceCount > 0) {
         list->referenceCount--;
     }
 
     if (list->referenceCount == 0) {
-        catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list);
+        CATTO_MUST_F(catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list));
     }
+
+    return CATTO_TRUE;
 }
 
 void catto_freeList(catto_Context* context, catto_List* list) {
@@ -45,8 +47,9 @@ void catto_freeList(catto_Context* context, catto_List* list) {
     CATTO_FREE(list);
 }
 
-void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_pushOntoList(catto_List* list, catto_TypedValue value) {
+    CATTO_SAFE_REALLOC(list->values, catto_TypedValue*, (++list->length) * sizeof(catto_TypedValue), CATTO_MUST_F(CATTO_DEST));
+
     list->values[list->length - 1] = catto_copyTypedValue(value);
 }
 

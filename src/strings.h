@@ -63,9 +63,9 @@ catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Ch
     return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
-catto_Char* catto_copyString(const catto_Char* string) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
-    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1);
+    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1); CATTO_MUST_N(newString);
 
     for (catto_Count i = 0; i < length; i++) {
         newString[i] = string[i];
@@ -76,21 +76,23 @@ catto_Char* catto_copyString(const catto_Char* string) {
     return newString;
 }
 
-catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
     catto_Count length = catto_stringLength(string);
 
-    string = (catto_Char*)CATTO_REALLOC(string, length + 2);
+    CATTO_SAFE_REALLOC(string, catto_Char*, length + 2, CATTO_MUST_N(CATTO_DEST));
+
     string[length] = character;
     string[length + 1] = '\0';
 
     return string;
 }
 
-catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
     catto_Count aLength = catto_stringLength(a);
     catto_Count bLength = catto_stringLength(b);
 
-    a = (catto_Char*)CATTO_REALLOC(a, aLength + bLength + 1);
+    CATTO_SAFE_REALLOC(a, catto_Char*, aLength + bLength + 1, CATTO_MUST_N(CATTO_DEST));
+
     a[aLength + bLength] = '\0';
 
     for (catto_Count i = 0; i < bLength; i++) {
@@ -100,8 +102,8 @@ catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
     return a;
 }
 
-catto_Char* catto_reverseString(catto_Char* string) {
-    catto_Char* tempString = catto_copyString(string);
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_reverseString(catto_Char* string) {
+    catto_Char* tempString = catto_copyString(string); CATTO_MUST_N(tempString);
     catto_Count stringLength = catto_stringLength(string);
 
     for (catto_Count i = 0; i < stringLength; i++) {

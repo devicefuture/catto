@@ -104,6 +104,32 @@ typedef CATTO_FLOAT catto_Float;
 
 #define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
 
+#define CATTO_MUST_C(condition, returnOnFail, cleanup) CATTO_FN_PREFIX if (!(condition)) {cleanup; return returnOnFail;}
+#define CATTO_MUST_R(condition, returnOnFail) CATTO_FN_PREFIX if (!(condition)) {return returnOnFail;}
+#define CATTO_MUST_N(condition) CATTO_MUST_R(condition, CATTO_NULL)
+#define CATTO_MUST_F(condition) CATTO_MUST_R(condition, CATTO_FALSE)
+#define CATTO_MUST_EC(condition, returnOnFail, cleanup) CATTO_FN_PREFIX if (!(condition)) {context->errorState = CATTO_ERROR_STATE_OUT_OF_MEMORY; cleanup; return returnOnFail;}
+#define CATTO_MUST_ER(condition, returnOnFail) CATTO_FN_PREFIX if (!(condition)) {context->errorState = CATTO_ERROR_STATE_OUT_OF_MEMORY; return returnOnFail;}
+#define CATTO_MUST_E(condition) CATTO_MUST_EC(condition, , )
+#define CATTO_MUST(condition) CATTO_MUST_R(condition, )
+#define CATTO_IGNORE(condition) (void)condition
+
+#define CATTO_THROWS(result) __attribute__((warn_unused_result))
+
+#define CATTO_TYPED_ZERO (catto_TypedValue) {.type = CATTO_DATA_TYPE_NUMBER, .value = {.asNumber = 0}}
+
+#define CATTO_SAFE_ASSIGN(dest, type, src, check) do { \
+        type CATTO_DEST = (type)src; \
+        if (CATTO_DEST) {dest = CATTO_DEST;} \
+        check; \
+    } while (CATTO_FALSE);
+
+#define CATTO_SAFE_REALLOC(pointer, type, newSize, check) do { \
+        type CATTO_DEST = (type)CATTO_REALLOC(pointer, newSize); \
+        if (CATTO_DEST) {pointer = CATTO_DEST;} \
+        check; \
+    } while (CATTO_FALSE);
+
 CATTO_FN_PREFIX void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset) {
     for (catto_Count i = 0; i < length; i++) {
         destination[i + offset] = source[i];
@@ -138,7 +164,8 @@ typedef enum {
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
     CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE,
-    CATTO_ERROR_STATE_UNKNOWN_FIELD
+    CATTO_ERROR_STATE_UNKNOWN_FIELD,
+    CATTO_ERROR_STATE_OUT_OF_MEMORY
 } catto_ErrorState;
 
 typedef enum {
@@ -354,7 +381,7 @@ catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Co
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
-void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
+catto_Bool catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
@@ -418,9 +445,9 @@ catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base,
 catto_List* catto_newList();
 void catto_addListField(catto_List* list, catto_Char* field);
 catto_List* catto_referenceList(catto_List* list);
-void catto_dereferenceList(catto_Context* context, catto_List* list);
+catto_Bool catto_dereferenceList(catto_Context* context, catto_List* list);
 void catto_freeList(catto_Context* context, catto_List* list);
-void catto_pushOntoList(catto_List* list, catto_TypedValue value);
+catto_Bool catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
 catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
@@ -438,7 +465,7 @@ catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
 catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type);
-void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
+catto_Bool catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
 catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);
@@ -642,13 +669,18 @@ CATTO_FN_PREFIX catto_TypedValue catto_binary_xor(catto_Context* context, catto_
     return catto_asTypedNumber(((catto_Int)catto_asNumber(a) ^ (catto_Int)catto_asNumber(b)) ? 1 : 0);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     if (a.type == CATTO_DATA_TYPE_NUMBER && b.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_asTypedNumber(catto_asNumber(a) == catto_asNumber(b) ? 1 : 0);
     }
 
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     catto_TypedValue result = catto_asTypedNumber(catto_stringsEqual(aString, bString) ? 1 : 0);
 
@@ -658,13 +690,18 @@ CATTO_FN_PREFIX catto_TypedValue catto_binary_equal(catto_Context* context, catt
     return result;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_binary_notEqual(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_notEqual(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     if (a.type == CATTO_DATA_TYPE_NUMBER && b.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_asTypedNumber(catto_asNumber(a) != catto_asNumber(b) ? 1 : 0);
     }
 
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     catto_TypedValue result = catto_asTypedNumber(!catto_stringsEqual(aString, bString) ? 1 : 0);
 
@@ -674,10 +711,16 @@ CATTO_FN_PREFIX catto_TypedValue catto_binary_notEqual(catto_Context* context, c
     return result;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     catto_Char* resultString = catto_copyString("");
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(resultString && aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(resultString);
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     resultString = catto_appendToString(resultString, aString);
     resultString = catto_appendToString(resultString, bString);
@@ -685,7 +728,9 @@ CATTO_FN_PREFIX catto_TypedValue catto_binary_concat(catto_Context* context, cat
     CATTO_FREE(aString);
     CATTO_FREE(bString);
 
-    catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString);
+    CATTO_MUST_EC(catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString), CATTO_TYPED_ZERO, {
+        CATTO_FREE(resultString);
+    });
 
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
@@ -723,8 +768,8 @@ CATTO_FN_PREFIX catto_OperatorMapping catto_operatorMappings[] = {
 
 // src/contexts.h
 
-CATTO_FN_PREFIX catto_Context* catto_newContext() {
-    catto_Context* context = CATTO_NEW(catto_Context);
+CATTO_THROWS(CATTO_NULL) catto_Context* catto_newContext() {
+    catto_Context* context = CATTO_NEW(catto_Context); CATTO_MUST_N(context);
 
     context->firstCommandHandler = CATTO_NULL;
     context->lastCommandHandler = CATTO_NULL;
@@ -761,6 +806,14 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->tokenIndexesCount = 0;
     context->tokenFile = (catto_Char*)CATTO_MALLOC(0);
     context->tokenFileSize = 0;
+
+    CATTO_MUST_C((
+        context->statementStack &&
+        context->pointersToGc &&
+        context->tokenDefinitions &&
+        context->tokenIndexes &&
+        context->tokenFile
+    ), CATTO_NULL, catto_freeContext(context));
 
     return context;
 }
@@ -838,16 +891,20 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
     CATTO_FREE(context);
 }
 
-CATTO_FN_PREFIX void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr) {
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 
-    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * (context->pointersToGcCount + 1));
+    CATTO_SAFE_REALLOC(context->pointersToGc, void**, sizeof(void*) * (context->pointersToGcCount + 1), CATTO_MUST_F(CATTO_DEST));
+
     context->pointersToGc[context->pointersToGcCount] = ptr;
 
-    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, sizeof(catto_DataType) * (context->pointersToGcCount + 1));
+    CATTO_SAFE_REALLOC(context->pointerTypesToGc, catto_DataType*, sizeof(catto_DataType) * (context->pointersToGcCount + 1), CATTO_MUST_F(CATTO_DEST));
+
     context->pointerTypesToGc[context->pointersToGcCount] = type;
 
     context->pointersToGcCount++;
+
+    return CATTO_TRUE;
 }
 
 CATTO_FN_PREFIX void catto_removePointerFromGc(catto_Context* context, void* ptr) {
@@ -1154,13 +1211,8 @@ CATTO_FN_PREFIX catto_Bool catto_hasNextArg(catto_Context* context) {
 }
 
 CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, catto_AstNode* astNode) {
-    const catto_TypedValue DEFAULT_RETURN_VALUE = (catto_TypedValue) {
-        .type = CATTO_DATA_TYPE_NUMBER,
-        .value = {.asNumber = 0}
-    };
-
     if (!astNode) {
-        return DEFAULT_RETURN_VALUE;
+        return CATTO_TYPED_ZERO;
     }
 
     if (astNode->type == CATTO_AST_NODE_TYPE_EXPRESSION_LEAF) {
@@ -1190,7 +1242,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                     if (variableValue.type != CATTO_DATA_TYPE_LIST) {
                         context->errorState = CATTO_ERROR_STATE_NOT_A_LIST;
 
-                        return DEFAULT_RETURN_VALUE;
+                        return CATTO_TYPED_ZERO;
                     }
 
                     catto_List* list = variableValue.value.asList;
@@ -1205,7 +1257,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                     if (field && !fieldExists) {
                         context->errorState = CATTO_ERROR_STATE_UNKNOWN_FIELD;
 
-                        return DEFAULT_RETURN_VALUE;
+                        return CATTO_TYPED_ZERO;
                     }
 
                     variableValue = catto_getListItem(list, index);
@@ -1227,7 +1279,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                 } else if (firstArgument) {
                     context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
 
-                    return DEFAULT_RETURN_VALUE;
+                    return CATTO_TYPED_ZERO;
                 }
 
                 if (type == CATTO_DATA_TYPE_NULL) {
@@ -1242,7 +1294,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
             } else if (firstArgument) {
                 context->errorState = CATTO_ERROR_STATE_NOT_A_FUNCTION;
 
-                return DEFAULT_RETURN_VALUE;
+                return CATTO_TYPED_ZERO;
             }
         }
     }
@@ -1261,7 +1313,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                     return function(context, catto_evalExpression(context, astNode->value.asUnaryExpression.child));
                 }
 
-                return DEFAULT_RETURN_VALUE;
+                return CATTO_TYPED_ZERO;
             }
 
             i++;
@@ -1292,14 +1344,14 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
                         break;
                     }
 
-                    return DEFAULT_RETURN_VALUE;
+                    return CATTO_TYPED_ZERO;
                 }
 
                 j++;
             }
 
             if (!foundOperatorMapping) {
-                return DEFAULT_RETURN_VALUE;
+                return CATTO_TYPED_ZERO;
             }
 
             currentChild = currentChild->nextAstNode;
@@ -1308,7 +1360,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_evalExpression(catto_Context* context, ca
         return currentValue;
     }
 
-    return DEFAULT_RETURN_VALUE;
+    return CATTO_TYPED_ZERO;
 }
 
 CATTO_FN_PREFIX catto_Bool catto_hasAppendFlag(catto_AstNode* astNode) {
@@ -2110,7 +2162,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
     return string;
 }
 
-CATTO_FN_PREFIX catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
     catto_Bool isNegative = CATTO_FALSE;
 
     if (number < 0) {
@@ -2126,7 +2178,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToBaseString(catto_Float number, catto_C
         return catto_copyString(isNegative ? "-Infinity" : "Infinity");
     }
 
-    catto_Char* string = catto_copyString("");
+    catto_Char* string = catto_copyString(""); CATTO_MUST_N(string);
 
     do {
         catto_Char digit = (catto_Int)number % base;
@@ -2220,9 +2272,9 @@ CATTO_FN_PREFIX catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a
     return _catto_stringsEqual(a, b, CATTO_TRUE);
 }
 
-CATTO_FN_PREFIX catto_Char* catto_copyString(const catto_Char* string) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
-    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1);
+    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1); CATTO_MUST_N(newString);
 
     for (catto_Count i = 0; i < length; i++) {
         newString[i] = string[i];
@@ -2233,21 +2285,23 @@ CATTO_FN_PREFIX catto_Char* catto_copyString(const catto_Char* string) {
     return newString;
 }
 
-CATTO_FN_PREFIX catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
     catto_Count length = catto_stringLength(string);
 
-    string = (catto_Char*)CATTO_REALLOC(string, length + 2);
+    CATTO_SAFE_REALLOC(string, catto_Char*, length + 2, CATTO_MUST_N(CATTO_DEST));
+
     string[length] = character;
     string[length + 1] = '\0';
 
     return string;
 }
 
-CATTO_FN_PREFIX catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
     catto_Count aLength = catto_stringLength(a);
     catto_Count bLength = catto_stringLength(b);
 
-    a = (catto_Char*)CATTO_REALLOC(a, aLength + bLength + 1);
+    CATTO_SAFE_REALLOC(a, catto_Char*, aLength + bLength + 1, CATTO_MUST_N(CATTO_DEST));
+
     a[aLength + bLength] = '\0';
 
     for (catto_Count i = 0; i < bLength; i++) {
@@ -2257,8 +2311,8 @@ CATTO_FN_PREFIX catto_Char* catto_appendToString(catto_Char* a, const catto_Char
     return a;
 }
 
-CATTO_FN_PREFIX catto_Char* catto_reverseString(catto_Char* string) {
-    catto_Char* tempString = catto_copyString(string);
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_reverseString(catto_Char* string) {
+    catto_Char* tempString = catto_copyString(string); CATTO_MUST_N(tempString);
     catto_Count stringLength = catto_stringLength(string);
 
     for (catto_Count i = 0; i < stringLength; i++) {
@@ -2508,14 +2562,16 @@ CATTO_FN_PREFIX catto_List* catto_referenceList(catto_List* list) {
     return list;
 }
 
-CATTO_FN_PREFIX void catto_dereferenceList(catto_Context* context, catto_List* list) {
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_dereferenceList(catto_Context* context, catto_List* list) {
     if (list->referenceCount > 0) {
         list->referenceCount--;
     }
 
     if (list->referenceCount == 0) {
-        catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list);
+        CATTO_MUST_F(catto_addPointerToGc(context, CATTO_DATA_TYPE_LIST, list));
     }
+
+    return CATTO_TRUE;
 }
 
 CATTO_FN_PREFIX void catto_freeList(catto_Context* context, catto_List* list) {
@@ -2532,8 +2588,9 @@ CATTO_FN_PREFIX void catto_freeList(catto_Context* context, catto_List* list) {
     CATTO_FREE(list);
 }
 
-CATTO_FN_PREFIX void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_pushOntoList(catto_List* list, catto_TypedValue value) {
+    CATTO_SAFE_REALLOC(list->values, catto_TypedValue*, (++list->length) * sizeof(catto_TypedValue), CATTO_MUST_F(CATTO_DEST));
+
     list->values[list->length - 1] = catto_copyTypedValue(value);
 }
 
@@ -2690,7 +2747,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_asTypedNumber(catto_Float value) {
     };
 }
 
-CATTO_FN_PREFIX catto_Char* catto_asString(catto_TypedValue value) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_asString(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_numberToString(value.value.asNumber);
     }
@@ -2706,10 +2763,12 @@ CATTO_FN_PREFIX catto_Char* catto_asString(catto_TypedValue value) {
     return catto_copyString("");
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_asTypedString(const catto_Char* value) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_asTypedString(const catto_Char* value) {
+    catto_Char* string = catto_copyString(value); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
-        .value = {.asString = catto_copyString(value)}
+        .value = {.asString = string}
     };
 }
 
@@ -2737,9 +2796,11 @@ CATTO_FN_PREFIX void catto_freeTypedValue(catto_TypedValue* valuePtr) {
     CATTO_FREE(valuePtr);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        value.value.asString = catto_copyString(value.value.asString);
+        catto_Char* string = catto_copyString(value.value.asString); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
+        value.value.asString = string;
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
@@ -2749,7 +2810,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     return value;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
     if (type == CATTO_DATA_TYPE_NULL) {
         return catto_copyTypedValue(value);
     }
@@ -2760,21 +2821,25 @@ CATTO_FN_PREFIX catto_TypedValue catto_castTypedValue(catto_TypedValue value, ca
     }
 
     if (type == CATTO_DATA_TYPE_STRING) {
-        value.value.asString = catto_asString(value);
+        catto_Char* string = catto_asString(value); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
+        value.value.asString = string;
         value.type = CATTO_DATA_TYPE_STRING;
     }
 
     return value;
 }
 
-CATTO_FN_PREFIX void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString);
+        CATTO_MUST_F(catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString));
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        catto_dereferenceList(context, value.value.asList);
+        CATTO_MUST_F(catto_dereferenceList(context, value.value.asList));
     }
+
+    return CATTO_TRUE;
 }
 
 CATTO_FN_PREFIX void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value) {
@@ -5088,8 +5153,8 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_max(catto_Context* context, catt
     return catto_asTypedNumber(b > a ? b : a);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
-    catto_Char* value = catto_asString(catto_evalNextArg(context));
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context)); CATTO_MUST_ER(value, CATTO_TYPED_ZERO);
 
     catto_TypedValue returnValue = catto_asTypedNumber(value[0]);
 
@@ -5098,12 +5163,14 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_asc(catto_Context* context, catt
     return returnValue;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
     catto_Int codepoint = catto_asNumber(catto_evalNextArg(context));
-    catto_Char* string = catto_copyString("");
+    catto_Char* string = catto_copyString(""); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
 
     if (codepoint > 0) {
-        string = catto_appendCharToString(string, codepoint);
+        CATTO_SAFE_ASSIGN(string, catto_Char*, catto_appendCharToString(string, codepoint), CATTO_MUST_EC(string, CATTO_TYPED_ZERO, {
+            CATTO_FREE(string);
+        }));
     }
 
     catto_TypedValue returnValue = catto_asTypedString(string);
@@ -5113,10 +5180,10 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_chr(catto_Context* context, catt
     return returnValue;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
     if (returnType == CATTO_DATA_TYPE_STRING) {
         catto_Float number = catto_asNumber(catto_evalNextArg(context));
-        catto_Char* string = catto_numberToBaseString(number, base);
+        catto_Char* string = catto_numberToBaseString(number, base); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
         catto_TypedValue returnValue = catto_asTypedString(string);
 
         CATTO_FREE(string);
@@ -5124,7 +5191,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_base(catto_Context* context, cat
         return returnValue;
     }
 
-    catto_Char* string = catto_asString(catto_evalNextArg(context));
+    catto_Char* string = catto_asString(catto_evalNextArg(context)); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
 
     catto_Count charactersEaten;
     catto_TypedValue returnValue = catto_asTypedNumber(catto_stringToBaseNumber(string, base, &charactersEaten));
@@ -5134,19 +5201,19 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_base(catto_Context* context, cat
     return returnValue;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 2, returnType);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 8, returnType);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 16, returnType);
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
@@ -5156,7 +5223,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_len(catto_Context* context, catt
         return catto_asTypedNumber(list->length / fieldCount);
     }
 
-    catto_Char* valueString = catto_asString(value);
+    catto_Char* valueString = catto_asString(value); CATTO_MUST_ER(valueString, CATTO_TYPED_ZERO);
     catto_TypedValue length = catto_asTypedNumber(catto_stringLength(valueString));
 
     CATTO_FREE(valueString);
@@ -5164,7 +5231,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_len(catto_Context* context, catt
     return length;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type != CATTO_DATA_TYPE_LIST) {
@@ -5182,7 +5249,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_last(catto_Context* context, cat
     return returnValue;
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
     catto_Char* string = catto_asString(catto_evalNextArg(context));
     catto_Char* delimeter = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString("");
     catto_Count delimeterLength = catto_stringLength(delimeter);
@@ -5200,7 +5267,11 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
             goto splitHere;
         }
 
-        currentString = catto_appendCharToString(currentString, string[i]);
+        CATTO_SAFE_ASSIGN(currentString, catto_Char*, catto_appendCharToString(currentString, string[i]), CATTO_MUST_EC(CATTO_DEST, CATTO_TYPED_ZERO, {
+            CATTO_FREE(currentString);
+            CATTO_FREE(string);
+            CATTO_FREE(delimeter);
+        }));
 
         i++;
 
@@ -5213,11 +5284,17 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
         catto_TypedValue typedString = catto_asTypedString(currentString);
 
         catto_pushOntoList(list, typedString);
-        catto_addTypedValueToGc(context, typedString);
 
         CATTO_FREE(currentString);
 
-        currentString = catto_copyString("");
+        CATTO_MUST_EC((
+            catto_pushOntoList(list, typedString) &&
+            catto_addTypedValueToGc(context, typedString) &&
+            (currentString = catto_copyString(""))
+        ), CATTO_TYPED_ZERO, {
+            CATTO_FREE(string);
+            CATTO_FREE(delimeter);
+        });
 
         if (!string[i]) {
             break;
@@ -5238,7 +5315,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_function_split(catto_Context* context, ca
     };
 }
 
-CATTO_FN_PREFIX catto_TypedValue catto_function_join(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_join(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type != CATTO_DATA_TYPE_LIST) {
@@ -5748,14 +5825,14 @@ CATTO_FN_PREFIX void cattox_csv_fromlist(catto_Context* context) {
         return;
     }
 
-    catto_Char* csvString = _cattox_csv_fromlist(listValue.value.asList);
+    catto_Char* csvString = _cattox_csv_fromlist(listValue.value.asList); CATTO_MUST_E(csvString);
     catto_TypedValue csvValue = catto_asTypedString(csvString);
 
     catto_setVariable(context, identifier, csvValue);
 
-    catto_addTypedValueToGc(context, csvValue);
-
     CATTO_FREE(csvString);
+
+    CATTO_MUST_E(catto_addTypedValueToGc(context, csvValue));
 }
 
 CATTO_FN_PREFIX catto_Bool _cattox_csv_parseNextFieldName(catto_Char* csv, catto_Count* indexPtr, catto_Char** fieldNamePtr) {
@@ -5853,7 +5930,7 @@ CATTO_FN_PREFIX catto_Bool _cattox_csv_parseNextValue(catto_Char* csv, catto_Cou
     return csv[(*indexPtr) - 1] == ',';
 }
 
-CATTO_FN_PREFIX catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
+CATTO_THROWS(CATTO_NULL) catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
     catto_List* list = catto_newList();
     catto_Count index = 0;
     catto_Char* currentFieldName = CATTO_NULL;
@@ -5904,7 +5981,9 @@ CATTO_FN_PREFIX catto_List* _cattox_csv_tolist(catto_Context* context, catto_Cha
 
             catto_setListItem(context, list, flatIndex, value);
 
-            catto_addTypedValueToGc(context, value);
+            CATTO_MUST_EC(catto_addTypedValueToGc(context, value), CATTO_NULL, {
+                CATTO_FREE(currentValue);
+            });
         }
 
         if (hasNextValueOnRecord) {

@@ -56,5 +56,5 @@ sed -i "s/^\(#define [^)]*) *\)\([a-zA-Z_][a-zA-Z0-9_]*.*(.*{\)/\1CATTO_FN_PREFI
 mkdir -p runtime/build
 mkdir -p examples/build
 
-$CC -Idist/ -DCATTO_USE_64_BIT runtime/catto.c -o runtime/build/catto
+$CC -Idist/ $1 -DCATTO_USE_64_BIT runtime/catto.c -o runtime/build/catto
 $CC -Idist/ examples/hello.c -o examples/build/hello

@@ -89,8 +89,8 @@ catto_TypedValue catto_function_max(catto_Context* context, catto_DataType retur
     return catto_asTypedNumber(b > a ? b : a);
 }
 
-catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
-    catto_Char* value = catto_asString(catto_evalNextArg(context));
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType returnType) {
+    catto_Char* value = catto_asString(catto_evalNextArg(context)); CATTO_MUST_ER(value, CATTO_TYPED_ZERO);
 
     catto_TypedValue returnValue = catto_asTypedNumber(value[0]);
 
@@ -99,12 +99,14 @@ catto_TypedValue catto_function_asc(catto_Context* context, catto_DataType retur
     return returnValue;
 }
 
-catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType returnType) {
     catto_Int codepoint = catto_asNumber(catto_evalNextArg(context));
-    catto_Char* string = catto_copyString("");
+    catto_Char* string = catto_copyString(""); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
 
     if (codepoint > 0) {
-        string = catto_appendCharToString(string, codepoint);
+        CATTO_SAFE_ASSIGN(string, catto_Char*, catto_appendCharToString(string, codepoint), CATTO_MUST_EC(string, CATTO_TYPED_ZERO, {
+            CATTO_FREE(string);
+        }));
     }
 
     catto_TypedValue returnValue = catto_asTypedString(string);
@@ -114,10 +116,10 @@ catto_TypedValue catto_function_chr(catto_Context* context, catto_DataType retur
     return returnValue;
 }
 
-catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, catto_DataType returnType) {
     if (returnType == CATTO_DATA_TYPE_STRING) {
         catto_Float number = catto_asNumber(catto_evalNextArg(context));
-        catto_Char* string = catto_numberToBaseString(number, base);
+        catto_Char* string = catto_numberToBaseString(number, base); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
         catto_TypedValue returnValue = catto_asTypedString(string);
 
         CATTO_FREE(string);
@@ -125,7 +127,7 @@ catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, c
         return returnValue;
     }
 
-    catto_Char* string = catto_asString(catto_evalNextArg(context));
+    catto_Char* string = catto_asString(catto_evalNextArg(context)); CATTO_MUST_ER(string, CATTO_TYPED_ZERO);
 
     catto_Count charactersEaten;
     catto_TypedValue returnValue = catto_asTypedNumber(catto_stringToBaseNumber(string, base, &charactersEaten));
@@ -135,19 +137,19 @@ catto_TypedValue catto_function_base(catto_Context* context, catto_Count base, c
     return returnValue;
 }
 
-catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_bin(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 2, returnType);
 }
 
-catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_oct(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 8, returnType);
 }
 
-catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_hex(catto_Context* context, catto_DataType returnType) {
     return catto_function_base(context, 16, returnType);
 }
 
-catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_len(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
@@ -157,7 +159,7 @@ catto_TypedValue catto_function_len(catto_Context* context, catto_DataType retur
         return catto_asTypedNumber(list->length / fieldCount);
     }
 
-    catto_Char* valueString = catto_asString(value);
+    catto_Char* valueString = catto_asString(value); CATTO_MUST_ER(valueString, CATTO_TYPED_ZERO);
     catto_TypedValue length = catto_asTypedNumber(catto_stringLength(valueString));
 
     CATTO_FREE(valueString);
@@ -165,7 +167,7 @@ catto_TypedValue catto_function_len(catto_Context* context, catto_DataType retur
     return length;
 }
 
-catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_last(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type != CATTO_DATA_TYPE_LIST) {
@@ -183,7 +185,7 @@ catto_TypedValue catto_function_last(catto_Context* context, catto_DataType retu
     return returnValue;
 }
 
-catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_split(catto_Context* context, catto_DataType returnType) {
     catto_Char* string = catto_asString(catto_evalNextArg(context));
     catto_Char* delimeter = catto_hasNextArg(context) ? catto_asString(catto_evalNextArg(context)) : catto_copyString("");
     catto_Count delimeterLength = catto_stringLength(delimeter);
@@ -201,7 +203,11 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
             goto splitHere;
         }
 
-        currentString = catto_appendCharToString(currentString, string[i]);
+        CATTO_SAFE_ASSIGN(currentString, catto_Char*, catto_appendCharToString(currentString, string[i]), CATTO_MUST_EC(CATTO_DEST, CATTO_TYPED_ZERO, {
+            CATTO_FREE(currentString);
+            CATTO_FREE(string);
+            CATTO_FREE(delimeter);
+        }));
 
         i++;
 
@@ -214,11 +220,17 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
         catto_TypedValue typedString = catto_asTypedString(currentString);
 
         catto_pushOntoList(list, typedString);
-        catto_addTypedValueToGc(context, typedString);
 
         CATTO_FREE(currentString);
 
-        currentString = catto_copyString("");
+        CATTO_MUST_EC((
+            catto_pushOntoList(list, typedString) &&
+            catto_addTypedValueToGc(context, typedString) &&
+            (currentString = catto_copyString(""))
+        ), CATTO_TYPED_ZERO, {
+            CATTO_FREE(string);
+            CATTO_FREE(delimeter);
+        });
 
         if (!string[i]) {
             break;
@@ -239,7 +251,7 @@ catto_TypedValue catto_function_split(catto_Context* context, catto_DataType ret
     };
 }
 
-catto_TypedValue catto_function_join(catto_Context* context, catto_DataType returnType) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_function_join(catto_Context* context, catto_DataType returnType) {
     catto_TypedValue value = catto_evalNextArg(context);
 
     if (value.type != CATTO_DATA_TYPE_LIST) {

@@ -14,7 +14,8 @@ typedef enum {
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
     CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE,
-    CATTO_ERROR_STATE_UNKNOWN_FIELD
+    CATTO_ERROR_STATE_UNKNOWN_FIELD,
+    CATTO_ERROR_STATE_OUT_OF_MEMORY
 } catto_ErrorState;
 
 typedef enum {
@@ -230,7 +231,7 @@ catto_Bool catto_memoryEquals(const catto_Char* a, const catto_Char* b, catto_Co
 
 catto_Context* catto_newContext();
 void catto_freeContext(catto_Context* context);
-void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
+catto_Bool catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr);
 void catto_removePointerFromGc(catto_Context* context, void* ptr);
 void catto_gc(catto_Context* context);
 void catto_addCommand(catto_Context* context, const catto_Char* name, catto_CommandHandlerFunction function);
@@ -294,9 +295,9 @@ catto_Float catto_stringToBaseNumber(const catto_Char* string, catto_Count base,
 catto_List* catto_newList();
 void catto_addListField(catto_List* list, catto_Char* field);
 catto_List* catto_referenceList(catto_List* list);
-void catto_dereferenceList(catto_Context* context, catto_List* list);
+catto_Bool catto_dereferenceList(catto_Context* context, catto_List* list);
 void catto_freeList(catto_Context* context, catto_List* list);
-void catto_pushOntoList(catto_List* list, catto_TypedValue value);
+catto_Bool catto_pushOntoList(catto_List* list, catto_TypedValue value);
 catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list);
 void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count index);
 catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, catto_Count index);
@@ -314,7 +315,7 @@ catto_Bool catto_asBool(catto_TypedValue value);
 void catto_freeTypedValue(catto_TypedValue* valuePtr);
 catto_TypedValue catto_copyTypedValue(catto_TypedValue value);
 catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type);
-void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
+catto_Bool catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value);
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value);
 
 catto_Token* catto_tokenise(catto_Context* context, const catto_Char* code);

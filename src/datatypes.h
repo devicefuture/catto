@@ -19,7 +19,7 @@ catto_TypedValue catto_asTypedNumber(catto_Float value) {
     };
 }
 
-catto_Char* catto_asString(catto_TypedValue value) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_asString(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_numberToString(value.value.asNumber);
     }
@@ -35,10 +35,12 @@ catto_Char* catto_asString(catto_TypedValue value) {
     return catto_copyString("");
 }
 
-catto_TypedValue catto_asTypedString(const catto_Char* value) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_asTypedString(const catto_Char* value) {
+    catto_Char* string = catto_copyString(value); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,
-        .value = {.asString = catto_copyString(value)}
+        .value = {.asString = string}
     };
 }
 
@@ -66,9 +68,11 @@ void catto_freeTypedValue(catto_TypedValue* valuePtr) {
     CATTO_FREE(valuePtr);
 }
 
-catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        value.value.asString = catto_copyString(value.value.asString);
+        catto_Char* string = catto_copyString(value.value.asString); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
+        value.value.asString = string;
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
@@ -78,7 +82,7 @@ catto_TypedValue catto_copyTypedValue(catto_TypedValue value) {
     return value;
 }
 
-catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType type) {
     if (type == CATTO_DATA_TYPE_NULL) {
         return catto_copyTypedValue(value);
     }
@@ -89,21 +93,25 @@ catto_TypedValue catto_castTypedValue(catto_TypedValue value, catto_DataType typ
     }
 
     if (type == CATTO_DATA_TYPE_STRING) {
-        value.value.asString = catto_asString(value);
+        catto_Char* string = catto_asString(value); CATTO_MUST_R(string, CATTO_TYPED_ZERO);
+
+        value.value.asString = string;
         value.type = CATTO_DATA_TYPE_STRING;
     }
 
     return value;
 }
 
-void catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
+CATTO_THROWS(CATTO_FALSE) catto_Bool catto_addTypedValueToGc(catto_Context* context, catto_TypedValue value) {
     if (value.type == CATTO_DATA_TYPE_STRING) {
-        catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString);
+        CATTO_MUST_F(catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, value.value.asString));
     }
 
     if (value.type == CATTO_DATA_TYPE_LIST) {
-        catto_dereferenceList(context, value.value.asList);
+        CATTO_MUST_F(catto_dereferenceList(context, value.value.asList));
     }
+
+    return CATTO_TRUE;
 }
 
 void catto_removeTypedValueFromGc(catto_Context* context, catto_TypedValue value) {

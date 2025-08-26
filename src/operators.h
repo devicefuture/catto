@@ -96,13 +96,18 @@ catto_TypedValue catto_binary_xor(catto_Context* context, catto_TypedValue a, ca
     return catto_asTypedNumber(((catto_Int)catto_asNumber(a) ^ (catto_Int)catto_asNumber(b)) ? 1 : 0);
 }
 
-catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     if (a.type == CATTO_DATA_TYPE_NUMBER && b.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_asTypedNumber(catto_asNumber(a) == catto_asNumber(b) ? 1 : 0);
     }
 
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     catto_TypedValue result = catto_asTypedNumber(catto_stringsEqual(aString, bString) ? 1 : 0);
 
@@ -112,13 +117,18 @@ catto_TypedValue catto_binary_equal(catto_Context* context, catto_TypedValue a, 
     return result;
 }
 
-catto_TypedValue catto_binary_notEqual(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_notEqual(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     if (a.type == CATTO_DATA_TYPE_NUMBER && b.type == CATTO_DATA_TYPE_NUMBER) {
         return catto_asTypedNumber(catto_asNumber(a) != catto_asNumber(b) ? 1 : 0);
     }
 
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     catto_TypedValue result = catto_asTypedNumber(!catto_stringsEqual(aString, bString) ? 1 : 0);
 
@@ -128,10 +138,16 @@ catto_TypedValue catto_binary_notEqual(catto_Context* context, catto_TypedValue 
     return result;
 }
 
-catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
+CATTO_THROWS(CATTO_TYPED_ZERO) catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a, catto_TypedValue b) {
     catto_Char* resultString = catto_copyString("");
     catto_Char* aString = catto_asString(a);
     catto_Char* bString = catto_asString(b);
+
+    CATTO_MUST_EC(resultString && aString && bString, CATTO_TYPED_ZERO, {
+        CATTO_FREE(resultString);
+        CATTO_FREE(aString);
+        CATTO_FREE(bString);
+    });
 
     resultString = catto_appendToString(resultString, aString);
     resultString = catto_appendToString(resultString, bString);
@@ -139,7 +155,9 @@ catto_TypedValue catto_binary_concat(catto_Context* context, catto_TypedValue a,
     CATTO_FREE(aString);
     CATTO_FREE(bString);
 
-    catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString);
+    CATTO_MUST_EC(catto_addPointerToGc(context, CATTO_DATA_TYPE_STRING, resultString), CATTO_TYPED_ZERO, {
+        CATTO_FREE(resultString);
+    });
 
     return (catto_TypedValue) {
         .type = CATTO_DATA_TYPE_STRING,

@@ -71,14 +71,14 @@ void cattox_csv_fromlist(catto_Context* context) {
         return;
     }
 
-    catto_Char* csvString = _cattox_csv_fromlist(listValue.value.asList);
+    catto_Char* csvString = _cattox_csv_fromlist(listValue.value.asList); CATTO_MUST_E(csvString);
     catto_TypedValue csvValue = catto_asTypedString(csvString);
 
     catto_setVariable(context, identifier, csvValue);
 
-    catto_addTypedValueToGc(context, csvValue);
-
     CATTO_FREE(csvString);
+
+    CATTO_MUST_E(catto_addTypedValueToGc(context, csvValue));
 }
 
 catto_Bool _cattox_csv_parseNextFieldName(catto_Char* csv, catto_Count* indexPtr, catto_Char** fieldNamePtr) {
@@ -176,7 +176,7 @@ catto_Bool _cattox_csv_parseNextValue(catto_Char* csv, catto_Count* indexPtr, ca
     return csv[(*indexPtr) - 1] == ',';
 }
 
-catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
+CATTO_THROWS(CATTO_NULL) catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
     catto_List* list = catto_newList();
     catto_Count index = 0;
     catto_Char* currentFieldName = CATTO_NULL;
@@ -227,7 +227,9 @@ catto_List* _cattox_csv_tolist(catto_Context* context, catto_Char* csv) {
 
             catto_setListItem(context, list, flatIndex, value);
 
-            catto_addTypedValueToGc(context, value);
+            CATTO_MUST_EC(catto_addTypedValueToGc(context, value), CATTO_NULL, {
+                CATTO_FREE(currentValue);
+            });
         }
 
         if (hasNextValueOnRecord) {

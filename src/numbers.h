@@ -378,7 +378,7 @@ catto_Char* catto_numberToString(catto_Float number) {
     return string;
 }
 
-catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
+CATTO_THROWS(CATTO_NULL) catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
     catto_Bool isNegative = CATTO_FALSE;
 
     if (number < 0) {
@@ -394,7 +394,7 @@ catto_Char* catto_numberToBaseString(catto_Float number, catto_Count base) {
         return catto_copyString(isNegative ? "-Infinity" : "Infinity");
     }
 
-    catto_Char* string = catto_copyString("");
+    catto_Char* string = catto_copyString(""); CATTO_MUST_N(string);
 
     do {
         catto_Char digit = (catto_Int)number % base;
