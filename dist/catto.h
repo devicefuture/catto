@@ -80,13 +80,15 @@ CATTO_FN_PREFIX void _catto_free(void* ptr) {
 #define CATTO_FREE _catto_free
 
 #ifndef CATTO_USE_CUSTOM_PANIC
-    void _catto_panic(const char* text) {
-        fprintf(stderr, "%s", text);
-        fflush(stderr);
-        exit(255);
-    }
 
-    #define CATTO_PANIC _catto_panic
+CATTO_FN_PREFIX void _catto_panic(const char* text) {
+    fprintf(stderr, "%s", text);
+    fflush(stderr);
+    exit(255);
+}
+
+#define CATTO_PANIC _catto_panic
+
 #endif
 
 #endif
@@ -116,9 +118,9 @@ typedef CATTO_FLOAT catto_Float;
 
 #define CATTO_NEW(type) (type*)catto_safeMalloc(sizeof(type))
 
-CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Char* catto_safetyBuffer = CATTO_NULL;
-CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Bool catto_initialised = CATTO_FALSE;
-CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Bool catto_outOfMemory = CATTO_FALSE;
+CATTO_FN_PREFIX catto_Char* catto_safetyBuffer = CATTO_NULL;
+CATTO_FN_PREFIX catto_Bool catto_initialised = CATTO_FALSE;
+CATTO_FN_PREFIX catto_Bool catto_outOfMemory = CATTO_FALSE;
 
 CATTO_FN_PREFIX void catto_ensureSafetyBuffer() {
     if (!catto_safetyBuffer) {
