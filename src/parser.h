@@ -263,7 +263,7 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
         return CATTO_NULL;
     }
 
-    catto_Char** operatorValues = (catto_Char**)CATTO_MALLOC(sizeof(catto_Char*));
+    catto_Char** operatorValues = (catto_Char**)catto_safeMalloc(sizeof(catto_Char*));
     catto_Count operatorCount = 0;
 
     operatorValues[0] = CATTO_NULL;
@@ -332,7 +332,7 @@ catto_AstNode* catto_parseBinaryExpression(catto_Count operatorPrecedenceLevel, 
 
         catto_eat(currentTokenPtr);
 
-        operatorValues = (catto_Char**)CATTO_REALLOC(operatorValues, sizeof(catto_Char*) * (operatorCount + 2));
+        operatorValues = (catto_Char**)catto_safeRealloc(operatorValues, sizeof(catto_Char*) * (operatorCount + 2));
         operatorValues[operatorCount++] = operatorValue->value.asString;
         operatorValues[operatorCount] = CATTO_NULL;
     }

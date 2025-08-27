@@ -1,6 +1,6 @@
 void catto_growTokenFile(catto_Context* context, catto_Count amount) {
     context->tokenFileSize += amount;
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, context->tokenFileSize);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, context->tokenFileSize);
 }
 
 void catto_appendCharToTokenFile(catto_Context* context, catto_Char c) {
@@ -39,7 +39,7 @@ void catto_appendCountToTokenFile(catto_Context* context, catto_Count value) {
 }
 
 void catto_generateTokenFile(catto_Context* context) {
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 4);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, 4);
     context->tokenFileSize = 4;
 
     context->tokenFile[0] = '\0';
@@ -117,9 +117,9 @@ catto_Char* catto_parseTokenFile(catto_Context* context) {
         CATTO_FREE(context->tokenDefinitions[i]);
     }
 
-    context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, 0);
+    context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, 0);
     context->tokenDefinitionsCount = 0;
-    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, 0);
+    context->tokenIndexes = (catto_Count*)catto_safeRealloc(context->tokenIndexes, 0);
     context->tokenIndexesCount = 0;
 
     if (!catto_isTokenFile(context)) {
@@ -149,7 +149,7 @@ catto_Char* catto_parseTokenFile(catto_Context* context) {
             }
 
             context->tokenDefinitionsCount = definitionsCount;
-            context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * definitionsCount);
+            context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, sizeof(catto_Char*) * definitionsCount);
 
             for (catto_Count i = 0; i < definitionsCount; i++) {
                 catto_Char* value = catto_readStringFromTokenFile(context, &index);

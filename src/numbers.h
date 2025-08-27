@@ -357,7 +357,7 @@ catto_Char* catto_numberToString(catto_Float number) {
 
         catto_Count newStringLength = catto_stringLength(string) - trailingZeroes;
 
-        string = (catto_Char*)CATTO_REALLOC(string, newStringLength + 1);
+        string = (catto_Char*)catto_safeRealloc(string, newStringLength + 1);
         string[newStringLength] = '\0';
     }
 

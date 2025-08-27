@@ -45,7 +45,7 @@ void catto_command_def(catto_Context* context) {
 
     if (procedure->parameterCount > 0) {
         procedure->parameterCount = 0;
-        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, 0);
+        procedure->parameterNames = (catto_Char**)catto_safeRealloc(procedure->parameterNames, 0);
     }
 
     while (catto_hasNextArg(context)) {
@@ -57,7 +57,12 @@ void catto_command_def(catto_Context* context) {
         }
 
         procedure->parameterCount++;
-        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, procedure->parameterCount * sizeof(catto_Char*));
+        procedure->parameterNames = (catto_Char**)catto_safeRealloc(procedure->parameterNames, procedure->parameterCount * sizeof(catto_Char*));
+
+        if (catto_outOfMemory) {
+            return;
+        }
+
         procedure->parameterNames[procedure->parameterCount - 1] = parameter;
     }
 

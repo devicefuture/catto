@@ -74,6 +74,18 @@ CATTO_FN_PREFIX void _catto_free(void* ptr) {
 #define CATTO_REALLOC _catto_realloc
 #define CATTO_FREE _catto_free
 
+#ifndef CATTO_USE_CUSTOM_PANIC
+    void _catto_panic(const char* text) {
+        fprintf(stderr, "%s", text);
+        fflush(stderr);
+        exit(255);
+    }
+
+    #define CATTO_PANIC _catto_panic
 #endif
+
+#endif
+
+#define CATTO_SAFETY_BUFFER_SIZE 512
 
 #endif

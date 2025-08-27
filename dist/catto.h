@@ -79,7 +79,19 @@ CATTO_FN_PREFIX void _catto_free(void* ptr) {
 #define CATTO_REALLOC _catto_realloc
 #define CATTO_FREE _catto_free
 
+#ifndef CATTO_USE_CUSTOM_PANIC
+    void _catto_panic(const char* text) {
+        fprintf(stderr, "%s", text);
+        fflush(stderr);
+        exit(255);
+    }
+
+    #define CATTO_PANIC _catto_panic
 #endif
+
+#endif
+
+#define CATTO_SAFETY_BUFFER_SIZE 512
 
 #endif
 
@@ -102,7 +114,81 @@ typedef CATTO_FLOAT catto_Float;
 #define CATTO_E 2.718281828459045
 #define CATTO_PHI 1.618033988798948
 
-#define CATTO_NEW(type) (type*)CATTO_MALLOC(sizeof(type))
+#define CATTO_NEW(type) (type*)catto_safeMalloc(sizeof(type))
+
+CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Char* catto_safetyBuffer = CATTO_NULL;
+CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Bool catto_initialised = CATTO_FALSE;
+CATTO_FN_PREFIX CATTO_FN_PREFIX catto_Bool catto_outOfMemory = CATTO_FALSE;
+
+CATTO_FN_PREFIX void catto_ensureSafetyBuffer() {
+    if (!catto_safetyBuffer) {
+        catto_safetyBuffer = (catto_Char*)CATTO_MALLOC(CATTO_SAFETY_BUFFER_SIZE);
+    }
+}
+
+CATTO_FN_PREFIX catto_Bool catto_init() {
+    catto_ensureSafetyBuffer();
+
+    catto_initialised = !!catto_safetyBuffer;
+
+    return catto_initialised;
+}
+
+CATTO_FN_PREFIX void* catto_safeMallocFallback(catto_Count size, catto_Count fallbackSize) {
+    void* newPtr = CATTO_MALLOC(size);
+
+    catto_ensureSafetyBuffer();
+
+    if (!newPtr) {
+        CATTO_FREE(catto_safetyBuffer);
+
+        catto_safetyBuffer = CATTO_NULL;
+        catto_outOfMemory = CATTO_TRUE;
+        newPtr = CATTO_MALLOC(fallbackSize);
+    }
+
+    if (!newPtr) {
+        #ifdef CATTO_PANIC
+            CATTO_PANIC("Out of memory (unrecoverable)\n");
+        #endif
+    }
+
+    return newPtr;
+}
+
+CATTO_FN_PREFIX void* catto_safeMalloc(catto_Count size) {
+    return catto_safeMallocFallback(size, size);
+}
+
+CATTO_FN_PREFIX void* catto_safeReallocFallback(void* ptr, catto_Count size, catto_Count fallbackSize) {
+    void* newPtr = CATTO_REALLOC(ptr, size);
+
+    if (size == 0) {
+        return newPtr;
+    }
+
+    catto_ensureSafetyBuffer();
+
+    if (!newPtr) {
+        CATTO_FREE(catto_safetyBuffer);
+
+        catto_safetyBuffer = CATTO_NULL;
+        catto_outOfMemory = CATTO_TRUE;
+        newPtr = CATTO_REALLOC(ptr, fallbackSize);
+    }
+
+    if (!newPtr) {
+        #ifdef CATTO_PANIC
+            CATTO_PANIC("Out of memory (unrecoverable)\n");
+        #endif
+    }
+
+    return newPtr;
+}
+
+CATTO_FN_PREFIX void* catto_safeRealloc(void* ptr, catto_Count size) {
+    return catto_safeReallocFallback(ptr, size, size);
+}
 
 CATTO_FN_PREFIX void catto_copyMemory(const catto_Char* source, catto_Char* destination, catto_Count length, catto_Count offset) {
     for (catto_Count i = 0; i < length; i++) {
@@ -138,7 +224,8 @@ typedef enum {
     CATTO_ERROR_STATE_NOT_A_LIST,
     CATTO_ERROR_STATE_INVALID_LIST_VALUE,
     CATTO_ERROR_STATE_CANNOT_ASSIGN_VALUE,
-    CATTO_ERROR_STATE_UNKNOWN_FIELD
+    CATTO_ERROR_STATE_UNKNOWN_FIELD,
+    CATTO_ERROR_STATE_OUT_OF_MEMORY
 } catto_ErrorState;
 
 typedef enum {
@@ -724,6 +811,10 @@ CATTO_FN_PREFIX catto_OperatorMapping catto_operatorMappings[] = {
 // src/contexts.h
 
 CATTO_FN_PREFIX catto_Context* catto_newContext() {
+    if (!catto_init()) {
+        return CATTO_NULL;
+    }
+
     catto_Context* context = CATTO_NEW(catto_Context);
 
     context->firstCommandHandler = CATTO_NULL;
@@ -740,11 +831,11 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->firstParsedArgument = CATTO_NULL;
     context->nextParsedArgument = CATTO_NULL;
 
-    context->statementStack = (catto_AstNode**)CATTO_MALLOC(0);
+    context->statementStack = (catto_AstNode**)catto_safeMalloc(0);
     context->statementStackCount = 0;
 
-    context->pointersToGc = (void**)CATTO_MALLOC(0);
-    context->pointerTypesToGc = (catto_DataType*)CATTO_MALLOC(0);
+    context->pointersToGc = (void**)catto_safeMalloc(0);
+    context->pointerTypesToGc = (catto_DataType*)catto_safeMalloc(0);
     context->pointersToGcCount = 0;
 
     context->errorState = CATTO_ERROR_STATE_NONE;
@@ -755,11 +846,11 @@ CATTO_FN_PREFIX catto_Context* catto_newContext() {
     context->randomSeed = 0xFFFFFFFF;
 
     context->generatingTokenFile = CATTO_FALSE;
-    context->tokenDefinitions = (catto_Char**)CATTO_MALLOC(0);
+    context->tokenDefinitions = (catto_Char**)catto_safeMalloc(0);
     context->tokenDefinitionsCount = 0;
-    context->tokenIndexes = (catto_Count*)CATTO_MALLOC(0);
+    context->tokenIndexes = (catto_Count*)catto_safeMalloc(0);
     context->tokenIndexesCount = 0;
-    context->tokenFile = (catto_Char*)CATTO_MALLOC(0);
+    context->tokenFile = (catto_Char*)catto_safeMalloc(0);
     context->tokenFileSize = 0;
 
     return context;
@@ -841,10 +932,10 @@ CATTO_FN_PREFIX void catto_freeContext(catto_Context* context) {
 CATTO_FN_PREFIX void catto_addPointerToGc(catto_Context* context, catto_DataType type, void* ptr) {
     catto_removePointerFromGc(context, ptr);
 
-    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, sizeof(void*) * (context->pointersToGcCount + 1));
+    context->pointersToGc = (void**)catto_safeRealloc(context->pointersToGc, sizeof(void*) * (context->pointersToGcCount + 1));
     context->pointersToGc[context->pointersToGcCount] = ptr;
 
-    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, sizeof(catto_DataType) * (context->pointersToGcCount + 1));
+    context->pointerTypesToGc = (catto_DataType*)catto_safeRealloc(context->pointerTypesToGc, sizeof(catto_DataType) * (context->pointersToGcCount + 1));
     context->pointerTypesToGc[context->pointersToGcCount] = type;
 
     context->pointersToGcCount++;
@@ -889,8 +980,8 @@ CATTO_FN_PREFIX void catto_gc(catto_Context* context) {
         }
     }
 
-    context->pointersToGc = (void**)CATTO_REALLOC(context->pointersToGc, 0);
-    context->pointerTypesToGc = (catto_DataType*)CATTO_REALLOC(context->pointerTypesToGc, 0);
+    context->pointersToGc = (void**)catto_safeRealloc(context->pointersToGc, 0);
+    context->pointerTypesToGc = (catto_DataType*)catto_safeRealloc(context->pointerTypesToGc, 0);
     context->pointersToGcCount = 0;
 }
 
@@ -1055,7 +1146,7 @@ CATTO_FN_PREFIX catto_Procedure* catto_createProcedure(catto_Context* context, c
     catto_Procedure* newProcedure = CATTO_NEW(catto_Procedure);
 
     newProcedure->name = catto_copyString(name);
-    newProcedure->parameterNames = (catto_Char**)CATTO_MALLOC(0);
+    newProcedure->parameterNames = (catto_Char**)catto_safeMalloc(0);
     newProcedure->parameterCount = 0;
     newProcedure->astNode = CATTO_NULL;
     newProcedure->nextProcedure = CATTO_NULL;
@@ -1534,6 +1625,11 @@ CATTO_FN_PREFIX catto_Bool catto_step(catto_Context* context) {
             return CATTO_FALSE;
     }
 
+    if (catto_outOfMemory) {
+        context->errorState = CATTO_ERROR_STATE_OUT_OF_MEMORY;
+        catto_outOfMemory = CATTO_FALSE;
+    }
+
     return context->nextParsedStatement && context->errorState == CATTO_ERROR_STATE_NONE;
 }
 
@@ -1552,7 +1648,15 @@ CATTO_FN_PREFIX void catto_goto(catto_Context* context, catto_Count lineNumber) 
 }
 
 CATTO_FN_PREFIX void catto_pushOntoStatementStack(catto_Context* context, catto_AstNode* statement) {
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (++context->statementStackCount) * sizeof(catto_AstNode**));
+    context->statementStack = (catto_AstNode**)catto_safeReallocFallback(
+        context->statementStack,
+        (++context->statementStackCount) * sizeof(catto_AstNode**),
+        context->statementStackCount * sizeof(catto_AstNode**)
+    );
+
+    if (catto_outOfMemory) {
+        return;
+    }
 
     context->statementStack[context->statementStackCount - 1] = statement;
 }
@@ -1603,7 +1707,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_popFromStatementStack(catto_Context* contex
     catto_Count scope = context->statementStackCount;
     catto_AstNode* lastStatement = context->statementStack[context->statementStackCount - 1];
 
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
+    context->statementStack = (catto_AstNode**)catto_safeRealloc(context->statementStack, (--context->statementStackCount) * sizeof(catto_AstNode**));
 
     return lastStatement;
 }
@@ -1686,7 +1790,7 @@ CATTO_FN_PREFIX void catto_load(catto_Context* context, const catto_Char* code) 
     context->subjectLineNumber = context->shouldUseDefinedLineNumbers ? 0 : 1;
     context->firstParsedStatement = firstAstNode;
     context->nextParsedStatement = firstAstNode;
-    context->statementStack = (catto_AstNode**)CATTO_REALLOC(context->statementStack, 0);
+    context->statementStack = (catto_AstNode**)catto_safeRealloc(context->statementStack, 0);
     context->statementStackCount = 0;
 
     catto_removeScopedVariables(context);
@@ -1698,7 +1802,7 @@ CATTO_FN_PREFIX void catto_loadWithSize(catto_Context* context, const catto_Char
 
     context->errorState = CATTO_ERROR_STATE_NONE;
 
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, size);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, size);
     context->tokenFileSize = size;
 
     catto_copyMemory(code, context->tokenFile, size, 0);
@@ -1720,7 +1824,7 @@ CATTO_FN_PREFIX void catto_loadWithSize(catto_Context* context, const catto_Char
 
     end:
 
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 0);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, 0);
     context->tokenFileSize = 0;
 }
 
@@ -2089,7 +2193,7 @@ CATTO_FN_PREFIX catto_Char* catto_numberToString(catto_Float number) {
 
         catto_Count newStringLength = catto_stringLength(string) - trailingZeroes;
 
-        string = (catto_Char*)CATTO_REALLOC(string, newStringLength + 1);
+        string = (catto_Char*)catto_safeRealloc(string, newStringLength + 1);
         string[newStringLength] = '\0';
     }
 
@@ -2222,7 +2326,13 @@ CATTO_FN_PREFIX catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a
 
 CATTO_FN_PREFIX catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
-    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1);
+    catto_Char* newString = (catto_Char*)catto_safeMallocFallback(length + 1, 1);
+
+    if (catto_outOfMemory) {
+        newString[0] = '\0';
+
+        return newString;
+    }
 
     for (catto_Count i = 0; i < length; i++) {
         newString[i] = string[i];
@@ -2236,7 +2346,7 @@ CATTO_FN_PREFIX catto_Char* catto_copyString(const catto_Char* string) {
 CATTO_FN_PREFIX catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
     catto_Count length = catto_stringLength(string);
 
-    string = (catto_Char*)CATTO_REALLOC(string, length + 2);
+    string = (catto_Char*)catto_safeRealloc(string, length + 2);
     string[length] = character;
     string[length + 1] = '\0';
 
@@ -2247,7 +2357,14 @@ CATTO_FN_PREFIX catto_Char* catto_appendToString(catto_Char* a, const catto_Char
     catto_Count aLength = catto_stringLength(a);
     catto_Count bLength = catto_stringLength(b);
 
-    a = (catto_Char*)CATTO_REALLOC(a, aLength + bLength + 1);
+    a = (catto_Char*)catto_safeReallocFallback(a, aLength + bLength + 1, 1);
+
+    if (catto_outOfMemory) {
+        a[0] = '\0';
+
+        return a;
+    }
+
     a[aLength + bLength] = '\0';
 
     for (catto_Count i = 0; i < bLength; i++) {
@@ -2488,9 +2605,9 @@ CATTO_FN_PREFIX catto_Float catto_stringToBaseNumber(const catto_Char* string, c
 CATTO_FN_PREFIX catto_List* catto_newList() {
     catto_List* list = CATTO_NEW(catto_List);
 
-    list->values = (catto_TypedValue*)CATTO_MALLOC(0);
+    list->values = (catto_TypedValue*)catto_safeMalloc(0);
     list->length = 0;
-    list->fields = (catto_Char**)CATTO_MALLOC(0);
+    list->fields = (catto_Char**)catto_safeMalloc(0);
     list->fieldCount = 0;
     list->referenceCount = 0;
 
@@ -2498,7 +2615,7 @@ CATTO_FN_PREFIX catto_List* catto_newList() {
 }
 
 CATTO_FN_PREFIX void catto_addListField(catto_List* list, catto_Char* field) {
-    list->fields = (catto_Char**)CATTO_REALLOC(list->fields, (++list->fieldCount) * sizeof(catto_Char*));
+    list->fields = (catto_Char**)catto_safeRealloc(list->fields, (++list->fieldCount) * sizeof(catto_Char*));
     list->fields[list->fieldCount - 1] = catto_copyString(field);
 }
 
@@ -2533,7 +2650,12 @@ CATTO_FN_PREFIX void catto_freeList(catto_Context* context, catto_List* list) {
 }
 
 CATTO_FN_PREFIX void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeReallocFallback(list->values, (++list->length) * sizeof(catto_TypedValue), list->length * sizeof(catto_TypedValue));
+
+    if (catto_outOfMemory) {
+        return;
+    }
+
     list->values[list->length - 1] = catto_copyTypedValue(value);
 }
 
@@ -2544,7 +2666,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_popFromList(catto_Context* context, catto
 
     catto_TypedValue value = list->values[--list->length];
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, list->length * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeRealloc(list->values, list->length * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 
@@ -2558,7 +2680,11 @@ CATTO_FN_PREFIX void catto_insertIntoList(catto_List* list, catto_TypedValue val
         return;
     }
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeReallocFallback(list->values, (++list->length) * sizeof(catto_TypedValue), list->length * sizeof(catto_TypedValue));
+
+    if (catto_outOfMemory) {
+        return;
+    }
 
     for (catto_Count i = list->length - 1; i > index; i--) {
         list->values[i] = list->values[i - 1];
@@ -2578,7 +2704,7 @@ CATTO_FN_PREFIX catto_TypedValue catto_removeFromList(catto_Context* context, ca
         list->values[i] = list->values[i + 1];
     }
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (--list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeRealloc(list->values, (--list->length) * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 
@@ -2963,7 +3089,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchStringLiteral(const catto_Char* code, ca
     catto_Count index = *indexPtr;
 
     catto_Char stringOpener = code[index++];
-    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)catto_safeMalloc(8);
     catto_Count currentStringIndex = 0;
 
     currentString[currentStringIndex] = '\0';
@@ -3013,7 +3139,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchStringLiteral(const catto_Char* code, ca
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)catto_safeRealloc(currentString, currentStringIndex + 9);
         }
     }
 
@@ -3028,7 +3154,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchStringLiteral(const catto_Char* code, ca
 
 CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
-    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)catto_safeMalloc(8);
     catto_Count currentStringIndex = 0;
     catto_Char currentChar = code[index++];
 
@@ -3067,7 +3193,7 @@ CATTO_FN_PREFIX catto_Token* catto_matchIdentifier(catto_Context* context, const
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)catto_safeRealloc(currentString, currentStringIndex + 9);
         }
     }
 
@@ -3102,12 +3228,12 @@ CATTO_FN_PREFIX void catto_emitToken(catto_Context* context, const catto_Char* c
     }
 
     if (!foundExistingDefinition) {
-        context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
+        context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
         index = context->tokenDefinitionsCount;
         context->tokenDefinitions[context->tokenDefinitionsCount++] = value;
     }
 
-    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
+    context->tokenIndexes = (catto_Count*)catto_safeRealloc(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
     context->tokenIndexes[context->tokenIndexesCount++] = index;
 }
 
@@ -3522,7 +3648,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseBinaryExpression(catto_Count operatorP
         return CATTO_NULL;
     }
 
-    catto_Char** operatorValues = (catto_Char**)CATTO_MALLOC(sizeof(catto_Char*));
+    catto_Char** operatorValues = (catto_Char**)catto_safeMalloc(sizeof(catto_Char*));
     catto_Count operatorCount = 0;
 
     operatorValues[0] = CATTO_NULL;
@@ -3591,7 +3717,7 @@ CATTO_FN_PREFIX catto_AstNode* catto_parseBinaryExpression(catto_Count operatorP
 
         catto_eat(currentTokenPtr);
 
-        operatorValues = (catto_Char**)CATTO_REALLOC(operatorValues, sizeof(catto_Char*) * (operatorCount + 2));
+        operatorValues = (catto_Char**)catto_safeRealloc(operatorValues, sizeof(catto_Char*) * (operatorCount + 2));
         operatorValues[operatorCount++] = operatorValue->value.asString;
         operatorValues[operatorCount] = CATTO_NULL;
     }
@@ -4163,7 +4289,7 @@ CATTO_FN_PREFIX void catto_debugAstNodes(catto_AstNode* firstAstNode) {
 
 CATTO_FN_PREFIX void catto_growTokenFile(catto_Context* context, catto_Count amount) {
     context->tokenFileSize += amount;
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, context->tokenFileSize);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, context->tokenFileSize);
 }
 
 CATTO_FN_PREFIX void catto_appendCharToTokenFile(catto_Context* context, catto_Char c) {
@@ -4202,7 +4328,7 @@ CATTO_FN_PREFIX void catto_appendCountToTokenFile(catto_Context* context, catto_
 }
 
 CATTO_FN_PREFIX void catto_generateTokenFile(catto_Context* context) {
-    context->tokenFile = (catto_Char*)CATTO_REALLOC(context->tokenFile, 4);
+    context->tokenFile = (catto_Char*)catto_safeRealloc(context->tokenFile, 4);
     context->tokenFileSize = 4;
 
     context->tokenFile[0] = '\0';
@@ -4280,9 +4406,9 @@ CATTO_FN_PREFIX catto_Char* catto_parseTokenFile(catto_Context* context) {
         CATTO_FREE(context->tokenDefinitions[i]);
     }
 
-    context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, 0);
+    context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, 0);
     context->tokenDefinitionsCount = 0;
-    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, 0);
+    context->tokenIndexes = (catto_Count*)catto_safeRealloc(context->tokenIndexes, 0);
     context->tokenIndexesCount = 0;
 
     if (!catto_isTokenFile(context)) {
@@ -4312,7 +4438,7 @@ CATTO_FN_PREFIX catto_Char* catto_parseTokenFile(catto_Context* context) {
             }
 
             context->tokenDefinitionsCount = definitionsCount;
-            context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * definitionsCount);
+            context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, sizeof(catto_Char*) * definitionsCount);
 
             for (catto_Count i = 0; i < definitionsCount; i++) {
                 catto_Char* value = catto_readStringFromTokenFile(context, &index);
@@ -4404,7 +4530,7 @@ CATTO_FN_PREFIX void catto_command_def(catto_Context* context) {
 
     if (procedure->parameterCount > 0) {
         procedure->parameterCount = 0;
-        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, 0);
+        procedure->parameterNames = (catto_Char**)catto_safeRealloc(procedure->parameterNames, 0);
     }
 
     while (catto_hasNextArg(context)) {
@@ -4416,7 +4542,12 @@ CATTO_FN_PREFIX void catto_command_def(catto_Context* context) {
         }
 
         procedure->parameterCount++;
-        procedure->parameterNames = (catto_Char**)CATTO_REALLOC(procedure->parameterNames, procedure->parameterCount * sizeof(catto_Char*));
+        procedure->parameterNames = (catto_Char**)catto_safeRealloc(procedure->parameterNames, procedure->parameterCount * sizeof(catto_Char*));
+
+        if (catto_outOfMemory) {
+            return;
+        }
+
         procedure->parameterNames[procedure->parameterCount - 1] = parameter;
     }
 

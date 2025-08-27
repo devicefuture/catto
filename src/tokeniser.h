@@ -176,7 +176,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
     catto_Count index = *indexPtr;
 
     catto_Char stringOpener = code[index++];
-    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)catto_safeMalloc(8);
     catto_Count currentStringIndex = 0;
 
     currentString[currentStringIndex] = '\0';
@@ -226,7 +226,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)catto_safeRealloc(currentString, currentStringIndex + 9);
         }
     }
 
@@ -241,7 +241,7 @@ catto_Token* catto_matchStringLiteral(const catto_Char* code, catto_Count* index
 
 catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* code, catto_Count* indexPtr, catto_Token** currentTokenPtr) {
     catto_Count index = *indexPtr;
-    catto_Char* currentString = (catto_Char*)CATTO_MALLOC(8);
+    catto_Char* currentString = (catto_Char*)catto_safeMalloc(8);
     catto_Count currentStringIndex = 0;
     catto_Char currentChar = code[index++];
 
@@ -280,7 +280,7 @@ catto_Token* catto_matchIdentifier(catto_Context* context, const catto_Char* cod
         currentString[currentStringIndex] = '\0';
 
         if ((currentStringIndex + 1) % 8 == 0) {
-            currentString = (catto_Char*)CATTO_REALLOC(currentString, currentStringIndex + 9);
+            currentString = (catto_Char*)catto_safeRealloc(currentString, currentStringIndex + 9);
         }
     }
 
@@ -315,12 +315,12 @@ void catto_emitToken(catto_Context* context, const catto_Char* code, catto_Count
     }
 
     if (!foundExistingDefinition) {
-        context->tokenDefinitions = (catto_Char**)CATTO_REALLOC(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
+        context->tokenDefinitions = (catto_Char**)catto_safeRealloc(context->tokenDefinitions, sizeof(catto_Char*) * (context->tokenDefinitionsCount + 1));
         index = context->tokenDefinitionsCount;
         context->tokenDefinitions[context->tokenDefinitionsCount++] = value;
     }
 
-    context->tokenIndexes = (catto_Count*)CATTO_REALLOC(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
+    context->tokenIndexes = (catto_Count*)catto_safeRealloc(context->tokenIndexes, sizeof(catto_Count) * (context->tokenIndexesCount + 1));
     context->tokenIndexes[context->tokenIndexesCount++] = index;
 }
 

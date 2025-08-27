@@ -1,9 +1,9 @@
 catto_List* catto_newList() {
     catto_List* list = CATTO_NEW(catto_List);
 
-    list->values = (catto_TypedValue*)CATTO_MALLOC(0);
+    list->values = (catto_TypedValue*)catto_safeMalloc(0);
     list->length = 0;
-    list->fields = (catto_Char**)CATTO_MALLOC(0);
+    list->fields = (catto_Char**)catto_safeMalloc(0);
     list->fieldCount = 0;
     list->referenceCount = 0;
 
@@ -11,7 +11,7 @@ catto_List* catto_newList() {
 }
 
 void catto_addListField(catto_List* list, catto_Char* field) {
-    list->fields = (catto_Char**)CATTO_REALLOC(list->fields, (++list->fieldCount) * sizeof(catto_Char*));
+    list->fields = (catto_Char**)catto_safeRealloc(list->fields, (++list->fieldCount) * sizeof(catto_Char*));
     list->fields[list->fieldCount - 1] = catto_copyString(field);
 }
 
@@ -46,7 +46,12 @@ void catto_freeList(catto_Context* context, catto_List* list) {
 }
 
 void catto_pushOntoList(catto_List* list, catto_TypedValue value) {
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeReallocFallback(list->values, (++list->length) * sizeof(catto_TypedValue), list->length * sizeof(catto_TypedValue));
+
+    if (catto_outOfMemory) {
+        return;
+    }
+
     list->values[list->length - 1] = catto_copyTypedValue(value);
 }
 
@@ -57,7 +62,7 @@ catto_TypedValue catto_popFromList(catto_Context* context, catto_List* list) {
 
     catto_TypedValue value = list->values[--list->length];
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, list->length * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeRealloc(list->values, list->length * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 
@@ -71,7 +76,11 @@ void catto_insertIntoList(catto_List* list, catto_TypedValue value, catto_Count 
         return;
     }
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (++list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeReallocFallback(list->values, (++list->length) * sizeof(catto_TypedValue), list->length * sizeof(catto_TypedValue));
+
+    if (catto_outOfMemory) {
+        return;
+    }
 
     for (catto_Count i = list->length - 1; i > index; i--) {
         list->values[i] = list->values[i - 1];
@@ -91,7 +100,7 @@ catto_TypedValue catto_removeFromList(catto_Context* context, catto_List* list, 
         list->values[i] = list->values[i + 1];
     }
 
-    list->values = (catto_TypedValue*)CATTO_REALLOC(list->values, (--list->length) * sizeof(catto_TypedValue));
+    list->values = (catto_TypedValue*)catto_safeRealloc(list->values, (--list->length) * sizeof(catto_TypedValue));
 
     catto_addTypedValueToGc(context, value);
 

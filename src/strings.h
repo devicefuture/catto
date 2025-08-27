@@ -65,7 +65,13 @@ catto_Bool catto_stringsEqualCaseInsensitive(const catto_Char* a, const catto_Ch
 
 catto_Char* catto_copyString(const catto_Char* string) {
     catto_Count length = catto_stringLength(string);
-    catto_Char* newString = (catto_Char*)CATTO_MALLOC(length + 1);
+    catto_Char* newString = (catto_Char*)catto_safeMallocFallback(length + 1, 1);
+
+    if (catto_outOfMemory) {
+        newString[0] = '\0';
+
+        return newString;
+    }
 
     for (catto_Count i = 0; i < length; i++) {
         newString[i] = string[i];
@@ -79,7 +85,7 @@ catto_Char* catto_copyString(const catto_Char* string) {
 catto_Char* catto_appendCharToString(catto_Char* string, catto_Char character) {
     catto_Count length = catto_stringLength(string);
 
-    string = (catto_Char*)CATTO_REALLOC(string, length + 2);
+    string = (catto_Char*)catto_safeRealloc(string, length + 2);
     string[length] = character;
     string[length + 1] = '\0';
 
@@ -90,7 +96,14 @@ catto_Char* catto_appendToString(catto_Char* a, const catto_Char* b) {
     catto_Count aLength = catto_stringLength(a);
     catto_Count bLength = catto_stringLength(b);
 
-    a = (catto_Char*)CATTO_REALLOC(a, aLength + bLength + 1);
+    a = (catto_Char*)catto_safeReallocFallback(a, aLength + bLength + 1, 1);
+
+    if (catto_outOfMemory) {
+        a[0] = '\0';
+
+        return a;
+    }
+
     a[aLength + bLength] = '\0';
 
     for (catto_Count i = 0; i < bLength; i++) {
