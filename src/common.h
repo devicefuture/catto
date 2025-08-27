@@ -17,9 +17,9 @@ typedef CATTO_FLOAT catto_Float;
 
 #define CATTO_NEW(type) (type*)catto_safeMalloc(sizeof(type))
 
-CATTO_FN_PREFIX catto_Char* catto_safetyBuffer = CATTO_NULL;
-CATTO_FN_PREFIX catto_Bool catto_initialised = CATTO_FALSE;
-CATTO_FN_PREFIX catto_Bool catto_outOfMemory = CATTO_FALSE;
+catto_Char* catto_safetyBuffer = CATTO_NULL;
+catto_Bool catto_initialised = CATTO_FALSE;
+catto_Bool catto_outOfMemory = CATTO_FALSE;
 
 void catto_ensureSafetyBuffer() {
     if (!catto_safetyBuffer) {
