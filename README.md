@@ -17,7 +17,7 @@ To start the interpreter, run:
 runtime/build/catto
 ```
 
-To interrupt running programs, press <kbd>esc</kbd>. To exit the interpreter, type `exit`.
+To interrupt a running program, press <kbd>esc</kbd>. To exit the interpreter, type `exit`.
 
 You can also run atto files by running this command, where `$FILE` is the atto file you want to run:
 
