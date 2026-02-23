@@ -65,6 +65,7 @@ void catto_generateTokenFile(catto_Context* context) {
 
     catto_appendCharToTokenFile(context, '\0');
 }
+
 catto_Bool catto_isTokenFile(catto_Context* context) {
     return context->tokenFileSize >= 4 && catto_memoryEquals(context->tokenFile, "\0AT\0", 4);
 }

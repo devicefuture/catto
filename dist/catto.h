@@ -4356,6 +4356,7 @@ CATTO_FN_PREFIX void catto_generateTokenFile(catto_Context* context) {
 
     catto_appendCharToTokenFile(context, '\0');
 }
+
 CATTO_FN_PREFIX catto_Bool catto_isTokenFile(catto_Context* context) {
     return context->tokenFileSize >= 4 && catto_memoryEquals(context->tokenFile, "\0AT\0", 4);
 }
